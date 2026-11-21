@@ -1,0 +1,14 @@
+<!DOCTYPE html>
+<html lang="en" xmlns:th="http://www.thymeleaf.org">
+<head th:replace="~{fragments :: head('Something went wrong')}"></head>
+<body>
+<header th:replace="~{fragments :: nav}"></header>
+<main class="wrap narrow">
+    <h1 th:text="${status == 404} ? 'Page not found' : 'Something went wrong'">Error</h1>
+    <p class="lead" th:text="${status == 404} ? 'That property may have sold or been withdrawn.' : 'Please try again in a moment.'">Message</p>
+    <p class="muted" th:text="${'Error ' + status}">Error</p>
+    <a class="btn" th:href="@{/}">Back to home</a>
+</main>
+<footer th:replace="~{fragments :: footer}"></footer>
+</body>
+</html>

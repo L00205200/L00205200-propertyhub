@@ -1,0 +1,40 @@
+# External uptime check (feedback loop outside the cluster).
+# Every 30 minutes: probe production. On failure, open (or update) a GitHub issue labelled "incident".
+# When it recovers, the open incident issue is closed automatically.
+name: Synthetic monitor
+
+on:
+  schedule:
+    - cron: "*/30 * * * *"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+  issues: write
+
+jobs:
+  probe:
+    if: vars.APP_URL != ''
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - id: check
+        continue-on-error: true
+        run: bash scripts/smoke-test.sh "${{ vars.APP_URL }}"
+      - name: Open or update incident
+        if: steps.check.outcome == 'failure'
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          gh label create incident --color B60205 --description "Production incident" 2>/dev/null || true
+          OPEN=$(gh issue list --label incident --state open --json number --jq '.[0].number')
+          MSG="Synthetic check failed at $(date -u +%FT%TZ) for ${{ vars.APP_URL }}. Run: ${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}"
+          if [ -n "$OPEN" ]; then gh issue comment "$OPEN" --body "$MSG"; else gh issue create --title "Production down: PropertyHub" --label incident --body "$MSG"; fi
+          exit 1
+      - name: Close recovered incident
+        if: steps.check.outcome == 'success'
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          OPEN=$(gh issue list --label incident --state open --json number --jq '.[0].number' 2>/dev/null || true)
+          if [ -n "$OPEN" ]; then gh issue close "$OPEN" --comment "Recovered at $(date -u +%FT%TZ)"; fi

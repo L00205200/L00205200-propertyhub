@@ -1,0 +1,360 @@
+AWSTemplateFormatVersion: "2010-09-09"
+Description: >-
+  PropertyHub CI server - EC2 instance running Jenkins (configured as code) and SonarQube in Docker.
+  Jenkins deploys to the PropertyHub k3s node through AWS SSM using this instance's IAM role (no stored AWS keys).
+  Works in a personal AWS account (CreateIamRoles=true) or AWS Academy Learner Lab (CreateIamRoles=false).
+
+Metadata:
+  AWS::CloudFormation::Interface:
+    ParameterGroups:
+      - Label: { default: "Access (restrict to your own IP)" }
+        Parameters: [AllowedCidr]
+      - Label: { default: "Pipeline settings" }
+        Parameters: [RepoUrl, DockerHubRepo, TargetInstanceId, AppUrl]
+      - Label: { default: "IAM (set CreateIamRoles=false in Learner Lab)" }
+        Parameters: [CreateIamRoles, ExistingInstanceProfile]
+      - Label: { default: "Compute and network" }
+        Parameters: [ProjectName, InstanceType, RootVolumeSize, LatestAmiId, VpcCidr, PublicSubnetCidr]
+    ParameterLabels:
+      AllowedCidr: { default: "Your IP address as x.x.x.x/32 (check https://checkip.amazonaws.com)" }
+      TargetInstanceId: { default: "k3s node instance ID (InstanceId output of the propertyhub stack; blank = no deploy)" }
+
+Parameters:
+  ProjectName:
+    Type: String
+    Default: propertyhub-ci
+    AllowedPattern: "^[a-z][a-z0-9-]{2,24}$"
+
+  AllowedCidr:
+    Type: String
+    AllowedPattern: '^(\d{1,3}\.){3}\d{1,3}/\d{1,2}$'
+    Description: Only this range can open Jenkins (8080) and SonarQube (9000). Use your-ip/32.
+
+  RepoUrl:
+    Type: String
+    AllowedPattern: "^https://.+\\.git$"
+    Description: Public Git repository with the Jenkinsfile, e.g. https://github.com/you/L00205200-propertyhub.git
+
+  DockerHubRepo:
+    Type: String
+    Default: docker.io/YOUR_DOCKERHUB_USER/l00205200-propertyhub
+    Description: Image repository the pipeline pushes to (create it public on Docker Hub)
+
+  TargetInstanceId:
+    Type: String
+    Default: ""
+    AllowedPattern: "^$|^i-[0-9a-f]{8,17}$"
+
+  AppUrl:
+    Type: String
+    Default: ""
+    Description: AppUrl output of the propertyhub stack, e.g. http://54.1.2.3 (blank = skip production smoke test)
+
+  CreateIamRoles:
+    Type: String
+    Default: "true"
+    AllowedValues: ["true", "false"]
+
+  ExistingInstanceProfile:
+    Type: String
+    Default: LabInstanceProfile
+
+  InstanceType:
+    Type: String
+    Default: t3.large
+    AllowedValues: [t3.medium, t3.large, t3.xlarge, m5.large]
+    Description: t3.large (8 GB) runs Jenkins + SonarQube + Maven builds comfortably
+
+  RootVolumeSize:
+    Type: Number
+    Default: 40
+    MinValue: 30
+    MaxValue: 200
+
+  LatestAmiId:
+    Type: AWS::SSM::Parameter::Value<AWS::EC2::Image::Id>
+    Default: /aws/service/canonical/ubuntu/server/24.04/stable/current/amd64/hvm/ebs-gp3/ami-id
+
+  VpcCidr:
+    Type: String
+    Default: 10.40.0.0/16
+    AllowedPattern: '^(\d{1,3}\.){3}\d{1,3}/\d{1,2}$'
+
+  PublicSubnetCidr:
+    Type: String
+    Default: 10.40.1.0/24
+    AllowedPattern: '^(\d{1,3}\.){3}\d{1,3}/\d{1,2}$'
+
+Conditions:
+  CreateRoles: !Equals [!Ref CreateIamRoles, "true"]
+
+Resources:
+  # ============================== NETWORK ==============================
+  Vpc:
+    Type: AWS::EC2::VPC
+    Metadata:
+      checkov:
+        skip:
+          - id: CKV2_AWS_11
+            comment: Flow logs omitted to keep the lab cost-free
+    Properties:
+      CidrBlock: !Ref VpcCidr
+      EnableDnsHostnames: true
+      EnableDnsSupport: true
+      Tags:
+        - { Key: Name, Value: !Sub "${ProjectName}-vpc" }
+
+  InternetGateway:
+    Type: AWS::EC2::InternetGateway
+
+  GatewayAttachment:
+    Type: AWS::EC2::VPCGatewayAttachment
+    Properties:
+      VpcId: !Ref Vpc
+      InternetGatewayId: !Ref InternetGateway
+
+  PublicSubnet:
+    Type: AWS::EC2::Subnet
+    Properties:
+      VpcId: !Ref Vpc
+      CidrBlock: !Ref PublicSubnetCidr
+      AvailabilityZone: !Select [0, !GetAZs ""]
+      MapPublicIpOnLaunch: false
+      Tags:
+        - { Key: Name, Value: !Sub "${ProjectName}-public" }
+
+  PublicRouteTable:
+    Type: AWS::EC2::RouteTable
+    Properties:
+      VpcId: !Ref Vpc
+
+  PublicRoute:
+    Type: AWS::EC2::Route
+    DependsOn: GatewayAttachment
+    Properties:
+      RouteTableId: !Ref PublicRouteTable
+      DestinationCidrBlock: 0.0.0.0/0
+      GatewayId: !Ref InternetGateway
+
+  PublicSubnetRouteAssociation:
+    Type: AWS::EC2::SubnetRouteTableAssociation
+    Properties:
+      SubnetId: !Ref PublicSubnet
+      RouteTableId: !Ref PublicRouteTable
+
+  CiSecurityGroup:
+    Type: AWS::EC2::SecurityGroup
+    Properties:
+      GroupDescription: Jenkins and SonarQube from your IP only; no SSH
+      VpcId: !Ref Vpc
+      SecurityGroupIngress:
+        - Description: Jenkins UI
+          IpProtocol: tcp
+          FromPort: 8080
+          ToPort: 8080
+          CidrIp: !Ref AllowedCidr
+        - Description: SonarQube UI
+          IpProtocol: tcp
+          FromPort: 9000
+          ToPort: 9000
+          CidrIp: !Ref AllowedCidr
+      SecurityGroupEgress:
+        - Description: Outbound for GitHub, Docker Hub, Maven Central and AWS APIs
+          IpProtocol: "-1"
+          CidrIp: 0.0.0.0/0
+      Tags:
+        - { Key: Name, Value: !Sub "${ProjectName}-sg" }
+
+  # ============================== SECRETS ==============================
+  JenkinsAdminSecret:
+    Type: AWS::SecretsManager::Secret
+    Metadata:
+      checkov:
+        skip:
+          - id: CKV_AWS_149
+            comment: AWS-managed key is sufficient for a lab
+    Properties:
+      Name: !Sub "${ProjectName}/jenkins-admin-password"
+      Description: Jenkins admin password (user "admin"), injected at boot
+      GenerateSecretString:
+        PasswordLength: 24
+        ExcludePunctuation: true
+
+  # ============================== IAM (personal account only) ==============================
+  CiRole:
+    Type: AWS::IAM::Role
+    Condition: CreateRoles
+    Properties:
+      RoleName: !Sub "${ProjectName}-jenkins"
+      AssumeRolePolicyDocument:
+        Version: "2012-10-17"
+        Statement:
+          - Effect: Allow
+            Principal: { Service: ec2.amazonaws.com }
+            Action: sts:AssumeRole
+      ManagedPolicyArns:
+        - !Sub "arn:${AWS::Partition}:iam::aws:policy/AmazonSSMManagedInstanceCore"
+      Policies:
+        - PolicyName: jenkins-deploy
+          PolicyDocument:
+            Version: "2012-10-17"
+            Statement:
+              - Sid: ReadOwnAdminSecret
+                Effect: Allow
+                Action: secretsmanager:GetSecretValue
+                Resource: !Ref JenkinsAdminSecret
+              - Sid: RunCommandOnPropertyHubNodesOnly
+                Effect: Allow
+                Action: ssm:SendCommand
+                Resource: !Sub "arn:${AWS::Partition}:ec2:${AWS::Region}:${AWS::AccountId}:instance/*"
+                Condition:
+                  StringEquals:
+                    "ssm:resourceTag/Project": propertyhub
+              - Sid: UseShellDocument
+                Effect: Allow
+                Action: ssm:SendCommand
+                Resource: !Sub "arn:${AWS::Partition}:ssm:${AWS::Region}::document/AWS-RunShellScript"
+              - Sid: ReadCommandResults
+                Effect: Allow
+                Action:
+                  - ssm:GetCommandInvocation
+                  - ssm:ListCommandInvocations
+                  - ec2:DescribeInstances
+                Resource: "*"
+
+  CiInstanceProfile:
+    Type: AWS::IAM::InstanceProfile
+    Condition: CreateRoles
+    Properties:
+      InstanceProfileName: !Sub "${ProjectName}-jenkins"
+      Roles: [!Ref CiRole]
+
+  # ============================== COMPUTE ==============================
+  JenkinsWaitHandle:
+    Type: AWS::CloudFormation::WaitConditionHandle
+
+  JenkinsWaitCondition:
+    Type: AWS::CloudFormation::WaitCondition
+    DependsOn: JenkinsServer
+    Properties:
+      Handle: !Ref JenkinsWaitHandle
+      Timeout: "1800"
+      Count: 1
+
+  JenkinsServer:
+    Type: AWS::EC2::Instance
+    DependsOn: PublicRoute
+    Metadata:
+      checkov:
+        skip:
+          - id: CKV_AWS_126
+            comment: Detailed monitoring costs extra
+    Properties:
+      ImageId: !Ref LatestAmiId
+      InstanceType: !Ref InstanceType
+      SubnetId: !Ref PublicSubnet
+      SecurityGroupIds: [!Ref CiSecurityGroup]
+      IamInstanceProfile: !If [CreateRoles, !Ref CiInstanceProfile, !Ref ExistingInstanceProfile]
+      EbsOptimized: true
+      Monitoring: false
+      MetadataOptions:
+        HttpTokens: required
+        HttpEndpoint: enabled
+        HttpPutResponseHopLimit: 2      # lets the Jenkins container use the instance role
+      BlockDeviceMappings:
+        - DeviceName: /dev/sda1
+          Ebs:
+            VolumeType: gp3
+            VolumeSize: !Ref RootVolumeSize
+            Encrypted: true
+            DeleteOnTermination: true
+      Tags:
+        - { Key: Name, Value: !Sub "${ProjectName}-jenkins" }
+      UserData:
+        Fn::Base64: !Sub |
+          #!/bin/bash
+          set -euxo pipefail
+          exec > >(tee -a /var/log/jenkins-bootstrap.log) 2>&1
+          WAIT_URL='${JenkinsWaitHandle}'
+          signal() {
+            printf '{"Status":"%s","Reason":"%s","UniqueId":"jenkins","Data":"%s"}' "$1" "$2" "$2" > /tmp/signal.json
+            curl -sS -X PUT -H 'Content-Type:' --data-binary @/tmp/signal.json "$WAIT_URL" || true
+          }
+          trap 'signal FAILURE "Jenkins bootstrap failed - see /var/log/jenkins-bootstrap.log"' ERR
+
+          # The Elastic IP is attached just after boot: wait for internet access
+          for _ in $(seq 1 60); do curl -s --max-time 5 -o /dev/null https://get.docker.com && break; sleep 5; done
+
+          export DEBIAN_FRONTEND=noninteractive
+          apt-get update -y
+          apt-get install -y git jq curl unzip ca-certificates
+          command -v aws >/dev/null 2>&1 || snap install aws-cli --classic
+
+          # ---- Docker Engine + Compose plugin ----
+          curl -fsSL https://get.docker.com | sh
+          systemctl enable --now docker
+
+          # ---- SonarQube (Elasticsearch) kernel settings ----
+          printf 'vm.max_map_count=524288\nfs.file-max=131072\n' > /etc/sysctl.d/99-sonarqube.conf
+          sysctl --system
+
+          # ---- Jenkins home on the host (same path inside the container) ----
+          mkdir -p /var/jenkins_home
+          chown 1000:1000 /var/jenkins_home
+
+          # ---- Jenkins/SonarQube config from the repository ----
+          git clone --depth 1 '${RepoUrl}' /opt/propertyhub
+          cd /opt/propertyhub/jenkins
+
+          ADMIN_PW=$(aws secretsmanager get-secret-value --region '${AWS::Region}' \
+            --secret-id '${JenkinsAdminSecret}' --query SecretString --output text)
+          IMDS_TOKEN=$(curl -sS -X PUT http://169.254.169.254/latest/api/token -H 'X-aws-ec2-metadata-token-ttl-seconds: 300')
+          PUBLIC_IP=$(curl -sS -H "X-aws-ec2-metadata-token: $IMDS_TOKEN" http://169.254.169.254/latest/meta-data/public-ipv4)
+          DOCKER_GID=$(getent group docker | cut -d: -f3)
+
+          umask 077
+          cat > .env <<EOF
+          JENKINS_ADMIN_PASSWORD=$ADMIN_PW
+          JENKINS_URL=http://$PUBLIC_IP:8080/
+          REPO_URL=${RepoUrl}
+          DOCKERHUB_REPO=${DockerHubRepo}
+          AWS_REGION=${AWS::Region}
+          EC2_INSTANCE_ID=${TargetInstanceId}
+          APP_URL=${AppUrl}
+          DOCKER_GID=$DOCKER_GID
+          EOF
+          unset ADMIN_PW
+          umask 022
+
+          docker compose up -d --build
+
+          # ---- wait until Jenkins answers ----
+          for _ in $(seq 1 90); do
+            CODE=$(curl -s -o /dev/null -w '%{http_code}' http://localhost:8080/login || true)
+            [ "$CODE" = "200" ] && break
+            sleep 10
+          done
+          [ "$CODE" = "200" ]
+          signal SUCCESS "Jenkins is up"
+
+  JenkinsEip:
+    Type: AWS::EC2::EIP
+    DependsOn: GatewayAttachment
+    Properties:
+      Domain: vpc
+      InstanceId: !Ref JenkinsServer
+
+Outputs:
+  JenkinsUrl:
+    Description: Jenkins (user admin)
+    Value: !Sub "http://${JenkinsEip}:8080"
+  SonarQubeUrl:
+    Description: SonarQube (admin/admin on first login - change it)
+    Value: !Sub "http://${JenkinsEip}:9000"
+  JenkinsAdminPasswordCommand:
+    Description: Run this to read the Jenkins admin password
+    Value: !Sub "aws secretsmanager get-secret-value --secret-id ${JenkinsAdminSecret} --query SecretString --output text --region ${AWS::Region}"
+  SessionManagerCommand:
+    Value: !Sub "aws ssm start-session --target ${JenkinsServer} --region ${AWS::Region}"
+  JenkinsInstanceId:
+    Value: !Ref JenkinsServer

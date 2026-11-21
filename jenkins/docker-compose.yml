@@ -1,0 +1,41 @@
+# Jenkins + SonarQube.  cp .env.example .env  (edit)  then:  docker compose up -d --build
+#   Jenkins:   http://<host>:8080   (user admin, password from .env)
+#   SonarQube: http://<host>:9000   (admin/admin on first login - change it)
+name: ci
+
+services:
+  jenkins:
+    build: .
+    image: propertyhub-jenkins:local
+    restart: unless-stopped
+    ports:
+      - "8080:8080"
+    env_file: .env
+    # Lets the jenkins user use the host Docker socket (host docker group id)
+    group_add:
+      - "${DOCKER_GID:-999}"
+    volumes:
+      # Same path inside and outside the container, so tool containers can mount the workspace
+      - /var/jenkins_home:/var/jenkins_home
+      - /var/run/docker.sock:/var/run/docker.sock
+    networks: [ci]
+
+  sonarqube:
+    image: sonarqube:lts-community
+    restart: unless-stopped
+    ports:
+      - "9000:9000"
+    volumes:
+      - sonar-data:/opt/sonarqube/data
+      - sonar-extensions:/opt/sonarqube/extensions
+      - sonar-logs:/opt/sonarqube/logs
+    networks: [ci]
+
+networks:
+  ci:
+    name: ci   # fixed name: pipeline tool containers join it to reach SonarQube
+
+volumes:
+  sonar-data:
+  sonar-extensions:
+  sonar-logs:

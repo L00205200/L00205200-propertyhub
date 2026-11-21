@@ -1,0 +1,66 @@
+<!DOCTYPE html>
+<html lang="en" xmlns:th="http://www.thymeleaf.org">
+<head th:replace="~{fragments :: head('What can I afford?')}"></head>
+<body>
+<header th:replace="~{fragments :: nav}"></header>
+
+<main class="wrap">
+    <h1>What can I afford?</h1>
+    <p class="lead">Your buying budget under the Central Bank of Ireland mortgage rules, including deposit,
+        stamp duty, fees and Help to Buy.</p>
+
+    <div class="tool-layout">
+        <form class="panel stack" th:action="@{/affordability}" th:object="${form}" method="get">
+            <input type="hidden" name="calc" value="true">
+            <label>Buyer type
+                <select th:field="*{buyerType}">
+                    <option th:each="b : ${buyerTypes}" th:value="${b}" th:text="${b.displayName}">FTB</option>
+                </select>
+            </label>
+            <label>Your gross annual income (€) <input type="number" min="0" step="1000" th:field="*{income1}"></label>
+            <label>Partner's gross annual income (€) <input type="number" min="0" step="1000" th:field="*{income2}"></label>
+            <label>Savings for deposit &amp; fees (€) <input type="number" min="0" step="1000" th:field="*{savings}"></label>
+            <label>Existing monthly loan repayments (€) <input type="number" min="0" step="50" th:field="*{monthlyDebts}"></label>
+            <div class="row2">
+                <label>Rate (%) <input type="number" min="0" max="15" step="0.05" th:field="*{rate}"></label>
+                <label>Term (years) <input type="number" min="5" max="40" th:field="*{term}"></label>
+            </div>
+            <label class="check"><input type="checkbox" th:field="*{newBuild}"> Buying a new build (Help to Buy)</label>
+            <button class="btn btn-block" type="submit">Calculate my budget</button>
+        </form>
+
+        <section th:if="${result != null}" class="results">
+            <div class="panel highlight">
+                <span class="muted">You could buy a home up to</span>
+                <div class="estimate" th:text="${@fmt.eur(result.maxPrice())}">€0</div>
+                <p th:text="${'Limited by: ' + result.limitingFactor()}">Limited by</p>
+            </div>
+            <div class="panel">
+                <dl>
+                    <dt>Mortgage</dt><dd th:text="${@fmt.eur(result.mortgage())}">€0</dd>
+                    <dt>Max loan from income</dt><dd th:text="${@fmt.eur(result.maxLoanByIncome())}">€0</dd>
+                    <dt>Deposit</dt><dd th:text="${@fmt.eur(result.deposit())}">€0</dd>
+                    <dt>Help to Buy</dt><dd th:text="${@fmt.eur(result.helpToBuy())}">€0</dd>
+                    <dt>Stamp duty</dt><dd th:text="${@fmt.eur(result.stampDuty())}">€0</dd>
+                    <dt>Legal, survey &amp; valuation</dt><dd th:text="${@fmt.eur(result.fees())}">€0</dd>
+                    <dt>Monthly repayment</dt><dd th:text="${@fmt.eur(result.monthlyRepayment())}">€0</dd>
+                    <dt>If rates rise 2%</dt><dd th:text="${@fmt.eur(result.stressedMonthlyRepayment())}">€0</dd>
+                    <dt>Repayments vs take-home pay</dt><dd th:text="${@fmt.pct(result.repaymentToIncomePct())}">0%</dd>
+                </dl>
+                <p class="muted small" th:if="${result.repaymentToIncomePct() > 35}">Repayments above about 35% of take-home pay can be hard to sustain. Lenders will assess this closely.</p>
+                <p class="muted small">Lenders may grant exceptions above these limits for some borrowers. Take-home pay is estimated at 72% of gross.</p>
+            </div>
+        </section>
+    </div>
+
+    <section th:if="${matches != null and !#lists.isEmpty(matches)}">
+        <h2>Homes within your budget</h2>
+        <div class="grid">
+            <th:block th:each="v : ${matches}"><a th:replace="~{fragments :: card(${v})}"></a></th:block>
+        </div>
+    </section>
+</main>
+
+<footer th:replace="~{fragments :: footer}"></footer>
+</body>
+</html>

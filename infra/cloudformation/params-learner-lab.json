@@ -1,0 +1,9 @@
+[
+  { "ParameterKey": "ProjectName",             "ParameterValue": "propertyhub" },
+  { "ParameterKey": "Owner",                   "ParameterValue": "L00205200" },
+  { "ParameterKey": "CreateIamRoles",          "ParameterValue": "false" },
+  { "ParameterKey": "ExistingInstanceProfile", "ParameterValue": "LabInstanceProfile" },
+  { "ParameterKey": "GitHubRepository",        "ParameterValue": "" },
+  { "ParameterKey": "InstanceType",            "ParameterValue": "t3.large" },
+  { "ParameterKey": "AllowedHttpCidr",         "ParameterValue": "0.0.0.0/0" }
+]

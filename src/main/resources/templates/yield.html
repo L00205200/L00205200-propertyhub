@@ -1,0 +1,49 @@
+<!DOCTYPE html>
+<html lang="en" xmlns:th="http://www.thymeleaf.org">
+<head th:replace="~{fragments :: head('Rental yield calculator')}"></head>
+<body>
+<header th:replace="~{fragments :: nav}"></header>
+
+<main class="wrap">
+    <h1>Rental yield &amp; buy-to-let calculator</h1>
+    <p class="lead">See gross and net yield, monthly cashflow on a 70% buy-to-let mortgage, and cash-on-cash return.</p>
+
+    <div class="tool-layout">
+        <form class="panel stack" th:action="@{/yield-calculator}" method="get">
+            <label>Purchase price (€) <input type="number" name="price" min="1" step="1000" th:value="${price}"></label>
+            <label>Monthly rent (€) <input type="number" name="rent" min="1" step="10" th:value="${rent}"></label>
+            <div class="row2">
+                <label>Mortgage rate (%) <input type="number" name="rate" min="0" max="15" step="0.05" th:value="${rate}"></label>
+                <label>Term (years) <input type="number" name="term" min="5" max="40" th:value="${term}"></label>
+            </div>
+            <button class="btn btn-block" type="submit">Calculate</button>
+        </form>
+
+        <section class="results">
+            <div class="panel highlight">
+                <span class="muted">Gross yield</span>
+                <div class="estimate" th:text="${@fmt.pct(result.grossYieldPct())}">0%</div>
+                <p><span class="chip chip-blue" th:text="${result.rating() + ' investment'}">Good</span></p>
+            </div>
+            <div class="panel">
+                <dl>
+                    <dt>Annual rent</dt><dd th:text="${@fmt.eur(result.annualRent())}">€0</dd>
+                    <dt>Annual running costs</dt><dd th:text="${@fmt.eur(result.annualCosts())}">€0</dd>
+                    <dt>Net income (before tax)</dt><dd th:text="${@fmt.eur(result.netAnnualIncome())}">€0</dd>
+                    <dt>Net yield</dt><dd th:text="${@fmt.pct(result.netYieldPct())}">0%</dd>
+                    <dt>Buy-to-let mortgage (70%)</dt><dd th:text="${@fmt.eur(result.mortgage())}">€0</dd>
+                    <dt>Monthly repayment</dt><dd th:text="${@fmt.eur(result.monthlyRepayment())}">€0</dd>
+                    <dt>Monthly cashflow</dt><dd th:text="${@fmt.eur(result.monthlyCashflow())}">€0</dd>
+                    <dt>Cash invested</dt><dd th:text="${@fmt.eur(result.cashInvested())}">€0</dd>
+                    <dt>Cash-on-cash return</dt><dd th:text="${@fmt.pct(result.cashOnCashPct())}">0%</dd>
+                </dl>
+                <p class="muted small">Costs assume 4% vacancy, 8% management, 5% maintenance, €450 insurance, LPT about 0.1% of value
+                    and €40 RTB registration. Income tax and USC on rental profit are not included.</p>
+            </div>
+        </section>
+    </div>
+</main>
+
+<footer th:replace="~{fragments :: footer}"></footer>
+</body>
+</html>

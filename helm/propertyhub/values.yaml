@@ -1,0 +1,56 @@
+# Default values for the PropertyHub chart.
+image:
+  repository: ghcr.io/your-github-user/your-repo   # overridden by the pipeline
+  tag: latest                                      # overridden by the pipeline (git SHA)
+  pullPolicy: IfNotPresent
+
+imagePullSecrets: []   # e.g. [{name: ghcr-pull}] if your GHCR package is private
+
+replicaCount: 2
+
+gitCommit: ""          # shown at /actuator/info so the pipeline can verify the new version is live
+
+resources:
+  requests:
+    cpu: 100m
+    memory: 384Mi
+  limits:
+    memory: 768Mi
+
+env:
+  CHAOS_ENABLED: "true"   # demo-only fault injection endpoints (/api/chaos/*); set "false" for real production
+
+service:
+  type: ClusterIP
+  port: 80
+
+ingress:
+  enabled: true
+  className: traefik      # k3s ships Traefik
+  host: ""                # empty = match any host (use the EC2 public IP)
+  path: /
+
+autoscaling:
+  enabled: true
+  minReplicas: 2
+  maxReplicas: 4
+  targetCPUUtilizationPercentage: 70
+
+podDisruptionBudget:
+  enabled: true
+  minAvailable: 1
+
+networkPolicy:
+  enabled: true
+  # Namespaces allowed to reach the pods: ingress controller and Prometheus
+  allowedNamespaces: [kube-system, monitoring]
+
+monitoring:
+  serviceMonitor:
+    enabled: true
+    interval: 15s
+  prometheusRule:
+    enabled: true
+  grafanaDashboard:
+    enabled: true
+    namespace: monitoring

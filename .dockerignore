@@ -1,0 +1,13 @@
+.git
+.github
+.idea
+.vscode
+target
+infra
+helm
+monitoring
+docs
+scripts
+*.md
+*.log
+docker-compose*.yml

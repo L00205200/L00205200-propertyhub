@@ -1,0 +1,69 @@
+<!DOCTYPE html>
+<html lang="en" xmlns:th="http://www.thymeleaf.org">
+<head th:replace="~{fragments :: head(${criteria.listingType().name() == 'RENT' ? 'Property to rent' : 'Property for sale'})}"></head>
+<body>
+<header th:replace="~{fragments :: nav}"></header>
+
+<main class="wrap search-layout">
+    <aside class="filters">
+        <form th:action="@{/search}" method="get">
+            <div class="toggle">
+                <label><input type="radio" name="type" value="SALE" th:checked="${criteria.listingType().name() == 'SALE'}"> Buy</label>
+                <label><input type="radio" name="type" value="RENT" th:checked="${criteria.listingType().name() == 'RENT'}"> Rent</label>
+            </div>
+            <label>Keyword <input type="text" name="q" th:value="${criteria.keyword()}"></label>
+            <label>County
+                <select name="county">
+                    <option value="">All Ireland</option>
+                    <option th:each="c : ${counties}" th:value="${c}" th:text="${c.displayName}" th:selected="${criteria.county() == c}">County</option>
+                </select>
+            </label>
+            <label>Property type
+                <select name="propertyType">
+                    <option value="">Any</option>
+                    <option th:each="p : ${propertyTypes}" th:value="${p}" th:text="${p.displayName}" th:selected="${criteria.propertyType() == p}">Type</option>
+                </select>
+            </label>
+            <div class="row2">
+                <label>Min price <input type="number" name="minPrice" min="0" step="1000" th:value="${criteria.minPrice()}"></label>
+                <label>Max price <input type="number" name="maxPrice" min="0" step="1000" th:value="${criteria.maxPrice()}"></label>
+            </div>
+            <label>Bedrooms
+                <select name="minBeds">
+                    <option value="">Any</option>
+                    <option th:each="b : ${#numbers.sequence(1,5)}" th:value="${b}" th:text="${b + '+'}" th:selected="${criteria.minBeds() == b}">1+</option>
+                </select>
+            </label>
+            <label>Minimum BER
+                <select name="minBer">
+                    <option value="">Any</option>
+                    <option th:each="b : ${berRatings}" th:value="${b}" th:text="${b}" th:selected="${criteria.minBer() == b}">A1</option>
+                </select>
+            </label>
+            <label class="check"><input type="checkbox" name="newBuild" value="true" th:checked="${criteria.newBuildOnly()}"> New builds only</label>
+            <label class="check"><input type="checkbox" name="reduced" value="true" th:checked="${criteria.reducedOnly()}"> Price reduced</label>
+            <label>Sort by
+                <select name="sort">
+                    <option th:each="s : ${sortOptions}" th:value="${s}" th:text="${s.label}" th:selected="${criteria.sort() == s}">Newest</option>
+                </select>
+            </label>
+            <button class="btn btn-block" type="submit">Update results</button>
+        </form>
+    </aside>
+
+    <section>
+        <h1 class="results-title">
+            <span th:text="${#lists.size(results)}">0</span>
+            <span th:text="${criteria.listingType().name() == 'RENT'} ? 'properties to rent' : 'properties for sale'">properties</span>
+            <span th:if="${criteria.county() != null}" th:text="${'in Co. ' + criteria.county().displayName}"></span>
+        </h1>
+        <p class="empty" th:if="${#lists.isEmpty(results)}">No properties match those filters. Try widening your search.</p>
+        <div class="grid">
+            <th:block th:each="v : ${results}"><a th:replace="~{fragments :: card(${v})}"></a></th:block>
+        </div>
+    </section>
+</main>
+
+<footer th:replace="~{fragments :: footer}"></footer>
+</body>
+</html>

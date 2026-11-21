@@ -1,0 +1,24 @@
+# Core pipeline
+workflow-aggregator
+pipeline-graph-view
+pipeline-stage-view
+git
+github-branch-source
+branch-api
+# Configuration as code + job creation
+configuration-as-code
+job-dsl
+# Build helpers
+docker-workflow
+credentials-binding
+timestamper
+ws-cleanup
+ansicolor
+# Reports and quality gates
+junit
+coverage
+warnings-ng
+sonar
+htmlpublisher
+# Monitoring: exposes Jenkins build metrics at /prometheus for Prometheus/Grafana
+prometheus

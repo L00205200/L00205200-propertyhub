@@ -1,0 +1,72 @@
+<!DOCTYPE html>
+<html lang="en" xmlns:th="http://www.thymeleaf.org">
+<head th:replace="~{fragments :: head('Buy, rent & sell property in Ireland')}"></head>
+<body>
+<header th:replace="~{fragments :: nav}"></header>
+
+<section class="hero">
+    <div class="wrap">
+        <h1>Find your place in Ireland.</h1>
+        <p class="lead">Search homes to buy or rent, see what every property is really worth, its rental potential,
+            and the income you'd need to buy it, all in one place.</p>
+
+        <form class="hero-search" th:action="@{/search}" method="get">
+            <div class="toggle">
+                <label><input type="radio" name="type" value="SALE" checked> Buy</label>
+                <label><input type="radio" name="type" value="RENT"> Rent</label>
+            </div>
+            <input type="text" name="q" placeholder="Town, area or keyword (e.g. Rathmines)" aria-label="Keyword">
+            <select name="county" aria-label="County">
+                <option value="">All Ireland</option>
+                <option th:each="c : ${counties}" th:value="${c}" th:text="${c.displayName}">County</option>
+            </select>
+            <select name="minBeds" aria-label="Bedrooms">
+                <option value="">Any beds</option>
+                <option th:each="b : ${#numbers.sequence(1,5)}" th:value="${b}" th:text="${b + '+ beds'}">1+</option>
+            </select>
+            <button class="btn" type="submit">Search</button>
+        </form>
+    </div>
+</section>
+
+<main class="wrap">
+    <section class="tiles">
+        <a class="tile" th:href="@{/sell}"><h3>Instant valuation</h3><p>What's my home worth? Get an estimate and price range in seconds.</p></a>
+        <a class="tile" th:href="@{/affordability}"><h3>What can I afford?</h3><p>Central Bank rules, deposit, stamp duty and Help to Buy, worked out for you.</p></a>
+        <a class="tile" th:href="@{/yield-calculator}"><h3>Rental potential</h3><p>Gross &amp; net yield, buy-to-let cashflow and cash-on-cash return.</p></a>
+        <a class="tile" th:href="@{/insights}"><h3>Market insights</h3><p>Prices, rents and yields by county, so you can compare where to buy.</p></a>
+    </section>
+
+    <section>
+        <div class="section-head">
+            <h2>Best value right now</h2>
+            <a th:href="@{/search(type='SALE',sort='DEAL_DESC')}">See all →</a>
+        </div>
+        <div class="grid">
+            <th:block th:each="v : ${featured}"><a th:replace="~{fragments :: card(${v})}"></a></th:block>
+        </div>
+    </section>
+
+    <section>
+        <div class="section-head">
+            <h2>Highest-yield counties</h2>
+            <a th:href="@{/insights}">Full market report →</a>
+        </div>
+        <table class="table">
+            <thead><tr><th>County</th><th>Avg asking</th><th>Avg 2-bed rent</th><th>Gross yield</th><th>Income needed (FTB)</th></tr></thead>
+            <tbody>
+            <tr th:each="i : ${insights}">
+                <td th:text="${i.county().displayName}">Dublin</td>
+                <td th:text="${@fmt.compact(i.avgAskingPrice())}">€0</td>
+                <td th:text="${@fmt.eur(i.avgRentTwoBed())}">€0</td>
+                <td th:text="${@fmt.pct(i.grossYieldPct())}">0%</td>
+                <td th:text="${@fmt.eur(i.incomeNeededFtb())}">€0</td>
+            </tr>
+            </tbody>
+        </table>
+    </section>
+</main>
+
+<footer th:replace="~{fragments :: footer}"></footer>
+</body>
+</html>

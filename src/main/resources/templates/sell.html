@@ -1,0 +1,80 @@
+<!DOCTYPE html>
+<html lang="en" xmlns:th="http://www.thymeleaf.org">
+<head th:replace="~{fragments :: head('Sell or let your property')}"></head>
+<body>
+<header th:replace="~{fragments :: nav}"></header>
+
+<main class="wrap">
+    <h1>What's my home worth?</h1>
+    <p class="lead">Get an instant estimate and rental value, then list your property in one click.</p>
+
+    <div class="tool-layout">
+        <form class="panel stack" th:action="@{/sell}" th:object="${sellForm}" method="post">
+            <div class="errors" th:if="${#fields.hasAnyErrors()}">Please correct the highlighted fields.</div>
+            <label>Address <input th:field="*{address}" placeholder="e.g. 12 Main Street" th:errorclass="invalid"></label>
+            <div class="row2">
+                <label>Area / town <input th:field="*{area}" placeholder="e.g. Rathmines" th:errorclass="invalid"></label>
+                <label>County
+                    <select th:field="*{county}">
+                        <option th:each="c : ${counties}" th:value="${c}" th:text="${c.displayName}">County</option>
+                    </select>
+                </label>
+            </div>
+            <div class="row2">
+                <label>Property type
+                    <select th:field="*{propertyType}">
+                        <option th:each="p : ${propertyTypes}" th:value="${p}" th:text="${p.displayName}">Type</option>
+                    </select>
+                </label>
+                <label>BER
+                    <select th:field="*{ber}">
+                        <option th:each="b : ${berRatings}" th:value="${b}" th:text="${b}">B2</option>
+                    </select>
+                </label>
+            </div>
+            <div class="row3">
+                <label>Beds <input type="number" min="1" max="10" th:field="*{beds}" th:errorclass="invalid"></label>
+                <label>Baths <input type="number" min="1" max="10" th:field="*{baths}" th:errorclass="invalid"></label>
+                <label>Floor area m² <input type="number" min="20" max="2000" th:field="*{floorAreaSqm}" th:errorclass="invalid"></label>
+            </div>
+            <label class="check"><input type="checkbox" th:field="*{newBuild}"> New build</label>
+
+            <button class="btn btn-outline btn-block" type="submit" th:formaction="@{/sell/estimate}">Get instant valuation</button>
+
+            <hr>
+            <h3>List it</h3>
+            <label>I want to
+                <select th:field="*{listingType}">
+                    <option value="SALE">Sell</option>
+                    <option value="RENT">Let (rent out)</option>
+                </select>
+            </label>
+            <label>Asking price or monthly rent (€). Leave blank to use our estimate
+                <input type="number" min="1" th:field="*{askingPrice}" th:errorclass="invalid"></label>
+            <label>Description <textarea rows="3" th:field="*{description}"></textarea></label>
+            <label>Agent or seller name <input th:field="*{agent}"></label>
+            <button class="btn btn-block" type="submit">Publish listing</button>
+        </form>
+
+        <section class="results" th:if="${valuation != null}">
+            <div class="panel highlight">
+                <span class="muted">PropertyHub estimate</span>
+                <div class="estimate" th:text="${@fmt.eur(valuation.estimate())}">€0</div>
+                <p th:text="${'Likely range ' + @fmt.compact(valuation.low()) + ' – ' + @fmt.compact(valuation.high())}">range</p>
+            </div>
+            <div class="panel">
+                <dl>
+                    <dt>Estimated rent</dt><dd th:text="${@fmt.eur(valuation.monthlyRent()) + ' / month'}">€0</dd>
+                    <dt>Value per m²</dt><dd th:text="${@fmt.eur(valuation.pricePerSqm())}">€0</dd>
+                    <dt>12-month forecast</dt><dd th:text="${@fmt.eur(valuation.oneYearForecast())}">€0</dd>
+                </dl>
+                <p class="muted small">Model: county €/m² × floor area × property type × BER rating × new-build premium.
+                    An estimate is not a formal valuation.</p>
+            </div>
+        </section>
+    </div>
+</main>
+
+<footer th:replace="~{fragments :: footer}"></footer>
+</body>
+</html>

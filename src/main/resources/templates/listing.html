@@ -1,0 +1,160 @@
+<!DOCTYPE html>
+<html lang="en" xmlns:th="http://www.thymeleaf.org">
+<head th:replace="~{fragments :: head(${l.title()})}"></head>
+<body>
+<header th:replace="~{fragments :: nav}"></header>
+
+<main class="wrap">
+    <p class="crumbs">
+        <a th:href="@{/search(type=${l.listingType()})}" th:text="${l.isForSale()} ? 'For sale' : 'To rent'">For sale</a> ›
+        <a th:href="@{/search(type=${l.listingType()},county=${l.county()})}" th:text="${'Co. ' + l.county().displayName}">County</a> ›
+        <span th:text="${l.area()}">Area</span>
+    </p>
+
+    <div class="flash" th:if="${message}" th:text="${message}">Thanks</div>
+
+    <div class="hero-img" th:classappend="${'hue-' + (l.id() % 8)}">
+        <span class="house-icon big">⌂</span>
+        <div class="badges">
+            <span class="badge" th:if="${l.newBuild()}">New build</span>
+            <span class="badge badge-red" th:if="${l.isPriceReduced()}" th:text="${'Reduced ' + @fmt.pct(l.reductionPct())}">Reduced</span>
+        </div>
+    </div>
+
+    <div class="detail-layout">
+        <section>
+            <div class="detail-head">
+                <div>
+                    <div class="price big">
+                        <span th:text="${@fmt.eur(l.price())}">€0</span>
+                        <small th:unless="${l.isForSale()}">/ month</small>
+                    </div>
+                    <h1 th:text="${l.title()}">Title</h1>
+                    <p class="muted" th:text="${l.address() + ', ' + l.area() + ', Co. ' + l.county().displayName}">Address</p>
+                </div>
+                <span class="chip chip-lg" th:classappend="${v.dealCss()}" th:text="${v.dealLabel()}">Fair price</span>
+            </div>
+
+            <ul class="keyfacts">
+                <li><strong th:text="${l.beds()}">3</strong> beds</li>
+                <li><strong th:text="${l.baths()}">2</strong> baths</li>
+                <li><strong th:text="${l.floorAreaSqm()}">100</strong> m²</li>
+                <li><span class="ber" th:classappend="${'ber-' + l.ber().grade()}" th:text="${'BER ' + l.ber()}">BER</span></li>
+                <li th:text="${l.propertyType().displayName}">Type</li>
+                <li><strong th:text="${v.daysOnMarket()}">0</strong> days listed</li>
+            </ul>
+
+            <h2>About this property</h2>
+            <p th:text="${l.description()}">Description</p>
+            <ul class="features">
+                <li th:each="f : ${l.features()}" th:text="${f}">Feature</li>
+            </ul>
+
+            <h2>Neighbourhood</h2>
+            <div class="scores">
+                <label>Walkability <progress max="100" th:value="${l.walkScore()}"></progress> <b th:text="${l.walkScore() + '/100'}"></b></label>
+                <label>Public transport <progress max="100" th:value="${l.transitScore()}"></progress> <b th:text="${l.transitScore() + '/100'}"></b></label>
+            </div>
+
+            <th:block th:if="${l.isForSale()}">
+                <h2>Mortgage calculator</h2>
+                <div class="mortcalc" id="mortcalc" th:attr="data-price=${l.price()}">
+                    <label>Price (€) <input id="mc-price" type="number" th:value="${l.price()}" min="0" step="1000"></label>
+                    <label>Deposit (%) <input id="mc-deposit" type="number" value="10" min="0" max="100" step="1"></label>
+                    <label>Interest rate (%) <input id="mc-rate" type="number" th:value="${defaultRate}" min="0" max="15" step="0.05"></label>
+                    <label>Term (years) <input id="mc-term" type="number" th:value="${defaultTerm}" min="5" max="40" step="1"></label>
+                    <div class="mc-out">
+                        <span>Monthly repayment</span>
+                        <strong id="mc-output" th:text="${@fmt.eur(v.monthlyRepaymentFtb())}">€0</strong>
+                        <small id="mc-loan"></small>
+                    </div>
+                </div>
+            </th:block>
+
+            <h2>Price history</h2>
+            <table class="table">
+                <thead><tr><th>Date</th><th>Event</th><th>Price</th></tr></thead>
+                <tbody>
+                <tr th:each="e : ${l.priceHistory()}">
+                    <td th:text="${#temporals.format(e.date(), 'd MMM yyyy')}">date</td>
+                    <td th:text="${e.event()}">Listed</td>
+                    <td th:text="${@fmt.eur(e.price())}">€0</td>
+                </tr>
+                </tbody>
+            </table>
+        </section>
+
+        <aside class="sidebar">
+            <div class="panel">
+                <h3>PropertyHub estimate</h3>
+                <th:block th:if="${l.isForSale()}">
+                    <div class="estimate" th:text="${@fmt.eur(v.valuation().estimate())}">€0</div>
+                    <p class="muted" th:text="${'Range ' + @fmt.compact(v.valuation().low()) + ' – ' + @fmt.compact(v.valuation().high())}">Range</p>
+                    <p th:text="${v.valueGapPct() >= 0 ? 'Asking price is ' + @fmt.pct(v.valueGapPct()) + ' below our estimate.' : 'Asking price is ' + @fmt.pct(-v.valueGapPct()) + ' above our estimate.'}">gap</p>
+                    <dl>
+                        <dt>Price per m²</dt><dd th:text="${@fmt.eur(l.pricePerSqm())}">€0</dd>
+                        <dt th:text="${'Co. ' + l.county().displayName + ' avg per m²'}">County avg</dt><dd th:text="${@fmt.eur(l.county().avgPricePerSqm)}">€0</dd>
+                        <dt>12-month forecast</dt><dd th:text="${@fmt.eur(v.valuation().oneYearForecast())}">€0</dd>
+                    </dl>
+                </th:block>
+                <th:block th:unless="${l.isForSale()}">
+                    <div class="estimate" th:text="${@fmt.eur(v.valuation().monthlyRent()) + ' / month'}">€0</div>
+                    <p th:text="${v.valueGapPct() >= 0 ? 'Rent is ' + @fmt.pct(v.valueGapPct()) + ' below the typical rent for similar homes.' : 'Rent is ' + @fmt.pct(-v.valueGapPct()) + ' above the typical rent for similar homes.'}">gap</p>
+                </th:block>
+            </div>
+
+            <div class="panel" th:if="${l.isForSale()}">
+                <h3>Rental potential</h3>
+                <dl>
+                    <dt>Estimated rent</dt><dd th:text="${@fmt.eur(v.valuation().monthlyRent()) + ' / mo'}">€0</dd>
+                    <dt>Gross yield</dt><dd th:text="${@fmt.pct(v.rentalYield().grossYieldPct())}">0%</dd>
+                    <dt>Net yield</dt><dd th:text="${@fmt.pct(v.rentalYield().netYieldPct())}">0%</dd>
+                    <dt>Buy-to-let cashflow</dt><dd th:text="${@fmt.eur(v.rentalYield().monthlyCashflow()) + ' / mo'}">€0</dd>
+                    <dt>Cash-on-cash return</dt><dd th:text="${@fmt.pct(v.rentalYield().cashOnCashPct())}">0%</dd>
+                </dl>
+                <p><span class="chip chip-blue" th:text="${v.rentalYield().rating() + ' investment'}">Good</span></p>
+                <a class="small" th:href="@{/yield-calculator(price=${l.price()},rent=${v.valuation().monthlyRent()})}">Adjust assumptions →</a>
+            </div>
+
+            <div class="panel" th:if="${l.isForSale()}">
+                <h3>Can I afford it?</h3>
+                <dl>
+                    <dt>Income needed (first-time buyer)</dt><dd th:text="${@fmt.eur(v.incomeNeededFtb())}">€0</dd>
+                    <dt>Cash needed on day one</dt><dd th:text="${@fmt.eur(v.cashNeededFtb())}">€0</dd>
+                    <dt>Stamp duty</dt><dd th:text="${@fmt.eur(v.stampDuty())}">€0</dd>
+                    <dt>Monthly repayment (90%)</dt><dd th:text="${@fmt.eur(v.monthlyRepaymentFtb())}">€0</dd>
+                </dl>
+                <p class="muted small" th:if="${l.newBuild() and l.price() <= 500000}">Includes Help to Buy relief for first-time buyers.</p>
+                <a class="small" th:href="@{/affordability}">Check your own budget →</a>
+            </div>
+
+            <div class="panel" th:unless="${l.isForSale()}">
+                <h3>Can I afford the rent?</h3>
+                <p>Suggested gross household income:
+                    <strong th:text="${@fmt.eur(l.price() * 12 / 0.35 / 0.72)}">€0</strong></p>
+                <p class="muted small">Based on rent of about 35% of take-home pay. A deposit of one month's rent is typical.</p>
+            </div>
+
+            <div class="panel">
+                <h3 th:text="${'Contact ' + l.agent()}">Contact agent</h3>
+                <form th:action="@{/listing/{id}/enquiry(id=${l.id()})}" method="post" class="stack">
+                    <input name="name" placeholder="Your name" required maxlength="60">
+                    <input name="email" type="email" placeholder="Email" required maxlength="120">
+                    <textarea name="message" rows="3" maxlength="500">I'd like to arrange a viewing.</textarea>
+                    <button class="btn btn-block" type="submit">Send enquiry</button>
+                </form>
+            </div>
+        </aside>
+    </div>
+
+    <section th:unless="${#lists.isEmpty(similar)}">
+        <h2>Similar properties nearby</h2>
+        <div class="grid">
+            <th:block th:each="s : ${similar}"><a th:replace="~{fragments :: card(${s})}"></a></th:block>
+        </div>
+    </section>
+</main>
+
+<footer th:replace="~{fragments :: footer}"></footer>
+</body>
+</html>

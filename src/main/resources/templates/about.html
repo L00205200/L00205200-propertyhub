@@ -1,0 +1,85 @@
+<!DOCTYPE html>
+<html lang="en" xmlns:th="http://www.thymeleaf.org">
+<head th:replace="~{fragments :: head('About this project')}"></head>
+<body>
+<header th:replace="~{fragments :: nav}"></header>
+
+<main class="wrap">
+    <div class="about-hero">
+        <div>
+            <h1>About this project</h1>
+            <p class="lead">PropertyHub Ireland is the sample web application for my CI/CD pipeline assignment.
+                Every change goes through an automated pipeline: build, test, code analysis, security scanning,
+                containerisation, deployment to Kubernetes on AWS, and monitoring.</p>
+        </div>
+        <div class="student-card">
+            <dl>
+                <dt>University</dt><dd th:text="${@projectInfo.university}">ATU</dd>
+                <dt>Course</dt><dd th:text="${@projectInfo.course}">Postgraduate DevOps</dd>
+                <dt>Assignment</dt><dd th:text="${@projectInfo.assignment}">Task 3</dd>
+                <dt>Student</dt><dd th:text="${@projectInfo.studentName}">Student</dd>
+                <dt>Student number</dt><dd th:text="${@projectInfo.studentNumber}">L00205200</dd>
+            </dl>
+        </div>
+    </div>
+
+    <div class="about-grid">
+        <section class="panel">
+            <h2>Pipeline stages (Jenkinsfile)</h2>
+            <ol class="stages">
+                <li>Build &amp; test: Maven, JUnit unit + integration tests, JaCoCo 70% coverage gate</li>
+                <li>Code quality: SpotBugs + FindSecBugs, SonarQube quality gate</li>
+                <li>Security: Trivy (dependencies), Gitleaks (secrets), Hadolint, Checkov, cfn-lint</li>
+                <li>Docker build: multi-stage, distroless, non-root image</li>
+                <li>Image scan: Trivy, plus a CycloneDX SBOM</li>
+                <li>Container smoke test</li>
+                <li>Push image to Docker Hub (main branch)</li>
+                <li>Deploy to k3s on AWS via SSM, with helm --atomic rollback and a Prometheus gate</li>
+                <li>Verify production: smoke test checks the new commit is live</li>
+            </ol>
+        </section>
+
+        <section class="panel">
+            <h2>Running release</h2>
+            <dl>
+                <dt>Version</dt><dd th:text="${@projectInfo.version}">local</dd>
+                <dt>Git commit</dt><dd><code th:text="${@projectInfo.shortCommit}">local</code></dd>
+            </dl>
+            <p class="muted small">The pipeline sets these at build time and checks them after each deploy.</p>
+            <h2>Useful endpoints</h2>
+            <ul class="stack-list">
+                <li><a th:href="@{/actuator/health}">/actuator/health</a>: liveness and readiness</li>
+                <li><a th:href="@{/actuator/info}">/actuator/info</a>: version, commit and student details</li>
+                <li><a th:href="@{/actuator/prometheus}">/actuator/prometheus</a>: metrics scraped by Prometheus</li>
+                <li><a th:href="@{/api/listings}">/api/listings</a>: REST API</li>
+            </ul>
+        </section>
+
+        <section class="panel">
+            <h2>Technology</h2>
+            <ul class="stack-list">
+                <li>Java 21, Spring Boot 3.5, Thymeleaf, Micrometer</li>
+                <li>Docker, Docker Compose, Kubernetes (k3s), Helm</li>
+                <li>Jenkins (configured as code), SonarQube</li>
+                <li>AWS EC2, CloudFormation / Terraform, Secrets Manager, SSM</li>
+                <li>Prometheus, Grafana, Alertmanager, Loki</li>
+            </ul>
+        </section>
+
+        <section class="panel">
+            <h2>What the app does</h2>
+            <ul class="stack-list">
+                <li>Search homes to buy or rent across Ireland</li>
+                <li>Instant valuation and a deal score for every listing</li>
+                <li>Rental yield and buy-to-let cash flow</li>
+                <li>Affordability under the Central Bank of Ireland mortgage rules</li>
+                <li>County market insights and a REST API</li>
+            </ul>
+            <p class="muted small">Listings are fictional sample data.</p>
+        </section>
+    </div>
+</main>
+
+<footer th:replace="~{fragments :: footer}"></footer>
+</body>
+</html>

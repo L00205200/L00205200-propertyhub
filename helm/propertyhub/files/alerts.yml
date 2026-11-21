@@ -1,0 +1,57 @@
+# Single source of truth for alert rules: mounted by docker-compose AND rendered into a PrometheusRule by Helm.
+groups:
+  - name: propertyhub.rules
+    rules:
+      - alert: PropertyHubDown
+        expr: up{job="propertyhub"} == 0
+        for: 1m
+        labels:
+          severity: critical
+          app: propertyhub
+        annotations:
+          summary: "PropertyHub instance {{ $labels.instance }} is down"
+          description: "Prometheus cannot scrape /actuator/prometheus for more than 1 minute."
+
+      - alert: PropertyHubHighErrorRate
+        expr: |
+          sum(rate(http_server_requests_seconds_count{application="propertyhub",status=~"5.."}[5m]))
+            / clamp_min(sum(rate(http_server_requests_seconds_count{application="propertyhub"}[5m])), 0.001) > 0.05
+        for: 2m
+        labels:
+          severity: critical
+          app: propertyhub
+        annotations:
+          summary: "More than 5% of requests are failing (HTTP 5xx)"
+          description: "5xx ratio is {{ $value | humanizePercentage }} over the last 5 minutes."
+
+      - alert: PropertyHubHighLatency
+        expr: |
+          histogram_quantile(0.95,
+            sum by (le) (rate(http_server_requests_seconds_bucket{application="propertyhub",uri!~"/actuator.*"}[5m]))) > 1
+        for: 5m
+        labels:
+          severity: warning
+          app: propertyhub
+        annotations:
+          summary: "p95 latency above 1s"
+          description: "95th percentile response time is {{ $value | humanizeDuration }}."
+
+      - alert: PropertyHubHighCpu
+        expr: process_cpu_usage{application="propertyhub"} > 0.85
+        for: 5m
+        labels:
+          severity: warning
+          app: propertyhub
+        annotations:
+          summary: "PropertyHub CPU above 85%"
+          description: "Process CPU usage is {{ $value | humanizePercentage }}."
+
+      - alert: PropertyHubPodRestarting
+        expr: increase(kube_pod_container_status_restarts_total{namespace="propertyhub",container="propertyhub"}[15m]) > 2
+        for: 1m
+        labels:
+          severity: warning
+          app: propertyhub
+        annotations:
+          summary: "PropertyHub pod {{ $labels.pod }} is restarting"
+          description: "Container restarted more than twice in 15 minutes (Kubernetes only)."

@@ -1,0 +1,16 @@
+apiVersion: v1
+kind: Service
+metadata:
+  # The Service name becomes the Prometheus "job" label (alerts use job="propertyhub")
+  name: propertyhub
+  labels:
+    {{- include "propertyhub.labels" . | nindent 4 }}
+spec:
+  type: {{ .Values.service.type }}
+  selector:
+    {{- include "propertyhub.selectorLabels" . | nindent 4 }}
+  ports:
+    - name: http
+      port: {{ .Values.service.port }}
+      targetPort: http
+      protocol: TCP

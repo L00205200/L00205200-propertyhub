@@ -1,0 +1,41 @@
+<!DOCTYPE html>
+<html lang="en" xmlns:th="http://www.thymeleaf.org">
+<head th:replace="~{fragments :: head('Market insights')}"></head>
+<body>
+<header th:replace="~{fragments :: nav}"></header>
+
+<main class="wrap">
+    <h1>Irish property market insights</h1>
+    <p class="lead">Compare counties by price, rent, yield and the income a first-time buyer needs.
+        Sorted by gross rental yield. Reference figures are illustrative.</p>
+
+    <div class="table-scroll">
+        <table class="table">
+            <thead>
+            <tr>
+                <th>County</th><th>Province</th><th>For sale</th><th>To rent</th><th>Avg asking</th>
+                <th>€ / m²</th><th>2-bed rent</th><th>Gross yield</th><th>Price growth (yr)</th><th>FTB income needed</th><th></th>
+            </tr>
+            </thead>
+            <tbody>
+            <tr th:each="i : ${insights}">
+                <td><strong th:text="${i.county().displayName}">Dublin</strong></td>
+                <td th:text="${i.county().province}">Leinster</td>
+                <td th:text="${i.forSale()}">0</td>
+                <td th:text="${i.toRent()}">0</td>
+                <td th:text="${i.avgAskingPrice() > 0 ? @fmt.compact(i.avgAskingPrice()) : '–'}">€0</td>
+                <td th:text="${@fmt.eur(i.avgPricePerSqm())}">€0</td>
+                <td th:text="${@fmt.eur(i.avgRentTwoBed())}">€0</td>
+                <td th:text="${i.forSale() > 0 ? @fmt.pct(i.grossYieldPct()) : '–'}">0%</td>
+                <td th:text="${'+' + @fmt.pct(i.annualGrowthPct())}">0%</td>
+                <td th:text="${i.avgAskingPrice() > 0 ? @fmt.eur(i.incomeNeededFtb()) : '–'}">€0</td>
+                <td><a th:href="@{/search(type='SALE',county=${i.county()})}">View →</a></td>
+            </tr>
+            </tbody>
+        </table>
+    </div>
+</main>
+
+<footer th:replace="~{fragments :: footer}"></footer>
+</body>
+</html>

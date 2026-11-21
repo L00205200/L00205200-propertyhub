@@ -1,0 +1,15 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!-- Documented exclusions. Records/DI constructors legitimately hold references. -->
+<FindBugsFilter>
+    <Match>
+        <Bug pattern="EI_EXPOSE_REP,EI_EXPOSE_REP2"/>
+    </Match>
+    <Match>
+        <!-- Spring MVC endpoints are intentionally public -->
+        <Bug pattern="SPRING_ENDPOINT"/>
+    </Match>
+    <Match>
+        <!-- Logs are emitted as ECS JSON in containers, which escapes CR/LF -->
+        <Bug pattern="CRLF_INJECTION_LOGS"/>
+    </Match>
+</FindBugsFilter>

@@ -1,0 +1,9 @@
+[
+  { "ParameterKey": "ProjectName",       "ParameterValue": "propertyhub" },
+  { "ParameterKey": "Owner",             "ParameterValue": "L00205200" },
+  { "ParameterKey": "CreateIamRoles",    "ParameterValue": "true" },
+  { "ParameterKey": "GitHubRepository",  "ParameterValue": "YOUR_GITHUB_USER/L00205200-propertyhub" },
+  { "ParameterKey": "CreateGitHubOidcProvider", "ParameterValue": "true" },
+  { "ParameterKey": "InstanceType",      "ParameterValue": "t3.large" },
+  { "ParameterKey": "AllowedHttpCidr",   "ParameterValue": "0.0.0.0/0" }
+]

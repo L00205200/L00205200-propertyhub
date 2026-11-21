@@ -1,0 +1,45 @@
+{{- /* These resources need the Prometheus Operator CRDs (installed by kube-prometheus-stack). */ -}}
+{{- $hasOperator := .Capabilities.APIVersions.Has "monitoring.coreos.com/v1" -}}
+{{- if and .Values.monitoring.serviceMonitor.enabled $hasOperator }}
+apiVersion: monitoring.coreos.com/v1
+kind: ServiceMonitor
+metadata:
+  name: propertyhub
+  labels:
+    {{- include "propertyhub.labels" . | nindent 4 }}
+    release: kube-prometheus-stack
+spec:
+  selector:
+    matchLabels:
+      {{- include "propertyhub.selectorLabels" . | nindent 6 }}
+  endpoints:
+    - port: http
+      path: /actuator/prometheus
+      interval: {{ .Values.monitoring.serviceMonitor.interval }}
+---
+{{- end }}
+{{- if and .Values.monitoring.prometheusRule.enabled $hasOperator }}
+apiVersion: monitoring.coreos.com/v1
+kind: PrometheusRule
+metadata:
+  name: propertyhub
+  labels:
+    {{- include "propertyhub.labels" . | nindent 4 }}
+    release: kube-prometheus-stack
+spec:
+{{ .Files.Get "files/alerts.yml" | indent 2 }}
+---
+{{- end }}
+{{- if .Values.monitoring.grafanaDashboard.enabled }}
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: propertyhub-dashboard
+  namespace: {{ .Values.monitoring.grafanaDashboard.namespace }}
+  labels:
+    {{- include "propertyhub.labels" . | nindent 4 }}
+    grafana_dashboard: "1"
+data:
+  propertyhub.json: |-
+{{ .Files.Get "dashboards/propertyhub.json" | indent 4 }}
+{{- end }}

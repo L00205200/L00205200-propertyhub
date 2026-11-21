@@ -1,0 +1,84 @@
+<!DOCTYPE html>
+<html lang="en" xmlns:th="http://www.thymeleaf.org">
+<head th:fragment="head(title)">
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <title th:text="${title} + ' | PropertyHub Ireland · ' + ${@projectInfo.studentNumber}">PropertyHub Ireland · L00205200</title>
+    <meta name="description" content="Buy, rent and sell property in Ireland with instant valuations, rental yield and mortgage affordability tools.">
+    <link rel="icon" type="image/svg+xml" th:href="@{/favicon.svg}">
+    <link rel="stylesheet" th:href="@{/css/app.css}">
+    <script th:src="@{/js/app.js}" defer></script>
+</head>
+<body>
+
+<header th:fragment="nav" class="site-header">
+    <div class="atu-bar">
+        <div class="wrap atu-inner">
+            <span><strong>ATU</strong> · <span th:text="${@projectInfo.course}">Postgraduate DevOps</span> ·
+                <span th:text="${@projectInfo.assignment}">Task 3 - CI/CD Pipeline</span></span>
+            <span>Student <strong th:text="${@projectInfo.studentNumber}">L00205200</strong> ·
+                <span th:text="${@projectInfo.studentName}">Student</span> ·
+                <a th:href="@{/about}">About this project</a></span>
+        </div>
+    </div>
+    <div class="wrap nav">
+        <a class="logo" th:href="@{/}"><span class="logo-mark">⌂</span> PropertyHub<span class="logo-ie">.ie</span></a>
+        <nav class="links">
+            <a th:href="@{/search(type='SALE')}">Buy</a>
+            <a th:href="@{/search(type='RENT')}">Rent</a>
+            <a th:href="@{/sell}">Sell &amp; value</a>
+            <a th:href="@{/affordability}">What can I afford?</a>
+            <a th:href="@{/yield-calculator}">Investors</a>
+            <a th:href="@{/insights}">Market insights</a>
+            <a th:href="@{/about}">About</a>
+        </nav>
+    </div>
+</header>
+
+<footer th:fragment="footer" class="site-footer">
+    <div class="wrap">
+        <p class="footer-atu">Built by <strong th:text="${@projectInfo.studentName}">Student</strong>
+            (<span th:text="${@projectInfo.studentNumber}">L00205200</span>) for
+            <span th:text="${@projectInfo.university}">ATU</span>, <span th:text="${@projectInfo.course}">course</span>,
+            <span th:text="${@projectInfo.assignment}">assignment</span>.
+            Running version <code th:text="${@projectInfo.shortCommit}">local</code>.</p>
+        <p><strong>PropertyHub Ireland</strong> is a demo application built for a DevOps CI/CD assignment.
+            Listings and market figures are fictional or illustrative. Mortgage rules modelled: Central Bank of
+            Ireland limits (first-time buyers 4x income, second-time 3.5x, 90% LTV; buy-to-let 70% LTV),
+            stamp duty 1% / 2% / 6% and Help to Buy (up to €30,000 on new builds ≤ €500,000).
+            This is not financial advice.</p>
+    </div>
+</footer>
+
+<a th:fragment="card(v)" class="card" th:href="@{/listing/{id}(id=${v.listing().id()})}">
+    <div class="card-img" th:classappend="${'hue-' + (v.listing().id() % 8)}">
+        <span class="house-icon">⌂</span>
+        <div class="badges">
+            <span class="badge" th:if="${v.listing().newBuild()}">New build</span>
+            <span class="badge badge-red" th:if="${v.listing().isPriceReduced()}"
+                  th:text="${'Reduced ' + @fmt.pct(v.listing().reductionPct())}">Reduced</span>
+        </div>
+        <span class="ber" th:classappend="${'ber-' + v.listing().ber().grade()}" th:text="${v.listing().ber()}">B2</span>
+    </div>
+    <div class="card-body">
+        <div class="price">
+            <span th:text="${@fmt.eur(v.listing().price())}">€0</span>
+            <small th:unless="${v.listing().isForSale()}">/ month</small>
+        </div>
+        <div class="title" th:text="${v.listing().title()}">Title</div>
+        <div class="muted" th:text="${v.listing().address() + ', ' + v.listing().area() + ', Co. ' + v.listing().county().displayName}">Address</div>
+        <div class="facts">
+            <span th:text="${v.listing().beds() + ' bed'}">3 bed</span> ·
+            <span th:text="${v.listing().baths() + ' bath'}">2 bath</span> ·
+            <span th:text="${v.listing().floorAreaSqm() + ' m²'}">100 m²</span>
+        </div>
+        <div class="chips">
+            <span class="chip" th:classappend="${v.dealCss()}" th:text="${v.dealLabel()}">Fair price</span>
+            <span class="chip chip-blue" th:if="${v.rentalYield() != null}"
+                  th:text="${@fmt.pct(v.rentalYield().grossYieldPct()) + ' yield'}">5% yield</span>
+        </div>
+    </div>
+</a>
+
+</body>
+</html>
