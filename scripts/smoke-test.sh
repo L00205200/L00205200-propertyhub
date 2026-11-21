@@ -15,10 +15,10 @@ if [ -n "$EXPECTED_SHA" ]; then
 fi
 
 echo "Home page..."
-curl -fsS "$BASE/" | grep -q "Best value right now"
+grep -q "Best value right now" <<< "$(curl -fsS "$BASE/")"
 
 echo "Assignment banner..."
-curl -fsS "$BASE/about" | grep -q "L00205200"
+grep -q "L00205200" <<< "$(curl -fsS "$BASE/about")"
 
 echo "Search API..."
 COUNT=$(curl -fsS "$BASE/api/listings?type=SALE" | jq 'length')
@@ -31,6 +31,6 @@ EST=$(curl -fsS -X POST "$BASE/api/valuation" -H 'Content-Type: application/json
 [ "$EST" -gt 0 ]
 
 echo "Security headers..."
-curl -fsSI "$BASE/" | grep -qi "content-security-policy"
+grep -qi "content-security-policy" <<< "$(curl -fsSI "$BASE/")"
 
 echo "Smoke test passed: ${COUNT} listings, sample valuation €${EST}"
