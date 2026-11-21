@@ -22,7 +22,7 @@ pipeline {
     }
 
     parameters {
-        booleanParam(name: 'RUN_SONAR', defaultValue: false,
+        booleanParam(name: 'RUN_SONAR', defaultValue: true,
                      description: 'Run SonarQube analysis + quality gate (set up the sonar-token credential first)')
         booleanParam(name: 'DEPLOY', defaultValue: true,
                      description: 'Deploy to AWS when building main')
@@ -68,7 +68,7 @@ pipeline {
                     if (params.RUN_SONAR) {
                         withSonarQubeEnv('sonarqube') {
                             sh "${MVN} -DskipTests org.sonarsource.scanner.maven:sonar-maven-plugin:sonar " +
-                               "-Dsonar.projectKey=propertyhub -Dsonar.projectName='PropertyHub Ireland'"
+                               "-Dsonar.projectKey=L00205200-propertyhub -Dsonar.projectName=L00205200-propertyhub"
                         }
                     }
                 }
