@@ -1,7 +1,7 @@
 # syntax=docker/dockerfile:1.7
 #checkov:skip=CKV_DOCKER_2:Distroless has no shell/curl; liveness/readiness are Kubernetes probes on /actuator/health
 # ---------- Stage 1: build with Maven (cached dependencies) ----------
-FROM maven:3.9.11-eclipse-temurin-21 AS build
+FROM maven:3.9-eclipse-temurin-26 AS build
 WORKDIR /src
 
 # Copy the POM first so dependency downloads are cached when only source changes
