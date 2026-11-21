@@ -1,3 +1,10 @@
 # Documented, time-boxed exceptions only. Format: CVE-ID  # reason, owner, review date
 # Example:
 # CVE-2099-00000  # not exploitable: feature unused. Reviewed by L00205200 on 2026-11-03, revisit 2026-12-01
+# spring-webmvc 6.2.12: fixed only in Spring Framework 7 (requires the Spring Boot 4 major upgrade, Dependabot PR #5).
+# Accepted for the lab with an expiry date; Trivy fails the build again after it. Owner: L00205200.
+CVE-2026-47884 exp:2026-12-31
+CVE-2026-47890 exp:2026-12-31
+# libbrotli1 in the distroless base image: the app uses the JDK's gzip, not the native Brotli decoder.
+# Remove once the base image ships 1.0.9-2+deb12u1.
+CVE-2026-111497 exp:2026-12-31
