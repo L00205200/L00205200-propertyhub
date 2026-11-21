@@ -127,7 +127,7 @@ pipeline {
 
         stage('Image scan & SBOM') {
             steps {
-                sh "${TRIVY} image --severity CRITICAL --ignore-unfixed --exit-code 1 \$IMAGE:\$TAG"
+                sh "${TRIVY} image --severity CRITICAL --ignore-unfixed --exit-code 1 --ignorefile \$WORKSPACE/.trivyignore \$IMAGE:\$TAG"
                 sh "${TRIVY} image --format cyclonedx --output \$WORKSPACE/sbom.cdx.json \$IMAGE:\$TAG"
                 archiveArtifacts artifacts: 'sbom.cdx.json', allowEmptyArchive: true
             }
