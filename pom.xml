@@ -21,7 +21,7 @@
     <properties>
         <java.version>21</java.version>
         <jacoco.version>0.8.13</jacoco.version>
-        <spotbugs.plugin.version>4.9.3.0</spotbugs.plugin.version>
+        <spotbugs.plugin.version>4.10.5.0</spotbugs.plugin.version>
         <findsecbugs.version>1.13.0</findsecbugs.version>
         <coverage.minimum>0.70</coverage.minimum>
         <!-- SonarCloud (used only when the Sonar job runs) -->
