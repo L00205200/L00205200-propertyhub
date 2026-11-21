@@ -52,7 +52,7 @@ jobs:
           provenance: true
           sbom: true
       - name: Package Helm chart
-        uses: azure/setup-helm@v4
+        uses: azure/setup-helm@v5
       - run: helm package helm/propertyhub --version "${GITHUB_REF_NAME#v}" --app-version "${GITHUB_REF_NAME#v}"
       - name: GitHub Release with notes, jar and chart
         uses: softprops/action-gh-release@v2
