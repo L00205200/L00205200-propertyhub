@@ -132,7 +132,7 @@ To deploy from a laptop, Jenkins also needs AWS credentials. Add them as Jenkins
 ## Check the Jenkinsfile before pushing
 
 ```bash
-curl -s -u admin:PASSWORD -X POST -F "jenkinsfile=<Jenkinsfile" http://<jenkins>:8080/pipeline-model-converter/validate
+curl -s -u admin -X POST -F "jenkinsfile=<Jenkinsfile" http://<jenkins>:8080/pipeline-model-converter/validate
 ```
 
 ## Learner Lab notes

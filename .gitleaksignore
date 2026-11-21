@@ -1,0 +1,2 @@
+# Reviewed false positive: placeholder "admin:PASSWORD" in a README curl example (no real secret).
+7fb3f133e27fdfbf0bbb568da2f9c2e48de27357:jenkins/README.md:curl-auth-user:135
