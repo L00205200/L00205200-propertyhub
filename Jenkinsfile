@@ -197,7 +197,7 @@ pipeline {
 
     post {
         always {
-            sh 'docker image rm $IMAGE:$TAG $IMAGE:latest >/dev/null 2>&1 || true'
+            sh 'docker image rm $IMAGE:$TAG >/dev/null 2>&1 || true'
         }
         success {
             echo "Pipeline passed for ${env.TAG}"
