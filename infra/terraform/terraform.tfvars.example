@@ -1,9 +1,0 @@
-# Copy to terraform.tfvars (git-ignored) and edit.
-github_repository  = "YOUR_GITHUB_USER/L00205200-propertyhub"   # exact case
-owner              = "L00205200"
-aws_region         = "eu-west-1"
-instance_type      = "t3.large"
-# Restrict access to your own IP for extra security, e.g. ["203.0.113.10/32"]
-allowed_http_cidrs = ["0.0.0.0/0"]
-# If your AWS account already has the GitHub OIDC provider, set this to false
-create_github_oidc_provider = true

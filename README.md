@@ -1,364 +1,255 @@
-# PropertyHub Ireland (L00205200): a CI/CD pipeline for a Java web app
+# L00205200-propertyhub: CI/CD Pipeline Project
 
-A Daft.ie and Zillow-style property marketplace for Ireland, built with **Spring Boot 3 / Java 21**. A complete
-DevOps pipeline takes it from a feature branch to a **monitored Kubernetes deployment on AWS**.
-
-> **Atlantic Technological University (ATU)** · Postgraduate DevOps · Task 3: CI/CD Pipeline
-> Student: **Raju Augustine (L00205200)** · Cloud: AWS eu-west-1 (Ireland)
-
----
-
-## 1. What the app does
-
-| Feature | Inspired by | Where |
-|---|---|---|
-| Search homes to **buy or rent**: county, type, price, beds, **BER** rating, new builds, price-reduced, keyword, 5 sort orders | Daft.ie, Rightmove | `/search` |
-| **Instant valuation** with price range and 12-month forecast | Zillow "Zestimate" | `/sell`, every listing |
-| **Deal score**: asking price vs. estimate ("Great price" / "Above estimate") | Redfin | listing cards |
-| **Rental potential**: estimated rent, gross & net yield, buy-to-let cashflow, cash-on-cash return | investor tools | listing page, `/yield-calculator` |
-| **What can I afford?** Central Bank of Ireland rules (FTB 4× income, second-time 3.5×, 90% LTV, BTL 70%), stamp duty (1% / 2% / 6%), **Help to Buy** (≤ €30k on new builds ≤ €500k), +2% rate stress test | MyHome, bank calculators | `/affordability` |
-| **Buyer income needed** and cash-on-day-one for every listing | Zillow affordability | listing page |
-| Live **mortgage calculator**, price history, walk/transit scores, similar homes, agent enquiry | Zillow, Daft | listing page |
-| **Market insights** by county: price, €/m², rent, yield, growth, income needed | Daft reports | `/insights` |
-| Sell or let your home: valuation, then publish a listing | Daft "Sell" | `/sell` |
-| JSON **REST API** | | `/api/listings`, `/api/valuation`, `/api/affordability`, `/api/yield`, `/api/insights` |
-
-Listings are fictional demo data and market figures are illustrative. The lending rules are accurate as of
-November 2026 ([Central Bank](https://www.centralbank.ie/consumer-hub/explainers/what-are-the-mortgage-measures),
-[Revenue stamp duty](https://www.revenue.ie/en/property/stamp-duty/property/stamp-duty-property/rates.aspx)).
+**Student:** Raju Augustine (L00205200)
+**College:** Atlantic Technological University (ATU)
+**Course:** Postgraduate DevOps
+**Assignment:** Task 3: Design and deploy a basic CI/CD pipeline
 
 ---
 
-## 2. Pipeline at a glance
+## 1. About this project
 
-```mermaid
-flowchart LR
-  dev[feature/* branch] -->|pull request| ci
-  subgraph ci [GitHub Actions: pipeline.yml]
-    b[Build + unit + integration tests<br/>JaCoCo gate 70%] --> c[Docker build<br/>Trivy image scan<br/>SBOM + smoke test]
-    s1[SpotBugs + FindSecBugs] --- s2[CodeQL] --- s3[Trivy deps] --- s4[Gitleaks] --- s5[Hadolint, Checkov,<br/>Helm lint, kubeconform, tf validate] --- s6[SonarCloud gate]
-  end
-  ci -->|merge to main| p[Publish image to GHCR<br/>provenance + SBOM]
-  p --> d[Deploy job, env: production<br/>GitHub OIDC to AWS, SSM Run Command]
-  d --> k[(EC2 + k3s<br/>Helm --atomic)]
-  k --> g{Prometheus gate:<br/>targets up, no critical alerts}
-  g -->|fail| r[helm rollback + red pipeline]
-  g -->|pass| v[Smoke test production]
-  k --> m[Prometheus, Alertmanager,<br/>Grafana, Loki]
-  m -. alerts .-> g
-  sm[Synthetic monitor every 30 min] -. opens incident issue .-> dev
-  tf[Terraform: infra.yml] --> k
-```
+For this assignment I built a small property website called **PropertyHub**, a bit like Daft.ie or Zillow, using
+**Java and Spring Boot**. Then I built a **CI/CD pipeline in Jenkins** that takes my code from GitHub, builds and
+tests it, checks it for security problems, puts it in a Docker container and deploys it to **AWS**. Every step
+happens automatically when I merge a change into the `main` branch.
 
-| Rubric criterion | How this repo meets it |
+**Live links (while my AWS stacks are running):**
+
+| What | Link |
 |---|---|
-| **Source code management (10)** | GitHub Flow: `feature/*` → PR → `main`, branch protection with required checks, PR template, Dependabot, tags `vX.Y.Z` create GitHub Releases (`release.yml`) |
-| **Automated builds & testing (20)** | `mvn verify`: **unit tests** (Surefire) + **integration tests** (Failsafe: MockMvc, real HTTP on a random port, Prometheus endpoint) + **JaCoCo coverage gate** + container smoke test + post-deploy smoke test |
-| **Static analysis & security (15)** | **SpotBugs+FindSecBugs**, **CodeQL**, **SonarCloud** quality gate (optional), **Trivy** (dependencies, secrets, image, IaC), **Gitleaks**, **Hadolint**, **Checkov**. Builds **fail** on CRITICAL CVEs, SAST findings, leaked secrets and IaC violations |
-| **Containerisation & orchestration (20)** | Multi-stage build → **distroless, non-root** image, layered jar, read-only rootfs; **Docker Compose** local stack; **Helm chart**: probes, HPA, PDB, NetworkPolicy, securityContext, ServiceMonitor, PrometheusRule |
-| **Deployment to cloud (20)** | **Terraform** or **CloudFormation** (VPC, EC2, IAM, OIDC, SSM) with remote **S3 state + locking**; **GitHub OIDC**, so no AWS keys are stored; secrets in **SSM Parameter Store**; zero-SSH deploys via **SSM Run Command**; `helm --atomic` auto-rollback; `infra.yml` runs plan/apply/destroy |
-| **Monitoring & logging (15)** | **Prometheus + Grafana** dashboard (golden signals, business metrics, JVM, logs), **Loki** logs, **Alertmanager** alerts (down, 5xx rate, p95 latency, CPU, restarts). **Feedback loops:** deploy gate rolls back on alerts; synthetic monitor opens GitHub issues |
+| PropertyHub website | http://34.246.109.154 |
+| About page (shows my student number and the deployed commit) | http://34.246.109.154/about |
+| Grafana monitoring | http://34.246.109.154/grafana |
+| Docker Hub image | https://hub.docker.com/r/rajuaugustine/l00205200-propertyhub |
 
-### Prefer Jenkins? (alternative to GitHub Actions)
+### What the website does
 
-The same pipeline also exists as a **`Jenkinsfile`**: build, tests and coverage, SpotBugs, a SonarQube quality gate,
-Trivy, Gitleaks, Hadolint, Checkov, an image scan with SBOM, a smoke test, the Docker Hub push, the SSM deploy and
-production checks. Jenkins and SonarQube run in Docker on an EC2 instance created by
-`infra/cloudformation/jenkins.yaml`, with Jenkins configured as code.
-**Step-by-step guide: [`jenkins/README.md`](jenkins/README.md).**
+- Search for homes to **buy or rent** by county, price, bedrooms and BER rating
+- Get an **instant valuation** of a home
+- See the **rental potential** of a property (estimated rent and yield)
+- Work out **what you can afford**, using the Irish mortgage rules (4x income for first-time buyers), stamp duty and Help to Buy
+- A mortgage calculator, market insights for each county, and a simple REST API (`/api/listings`, `/api/valuation` and more)
 
----
-
-## 3. Repository layout
-
-```
-├── src/main/java/ie/propertyhub   # domain, calculators (plain Java), service, web, API
-├── src/test/java                  # *Test = unit (Surefire), *IT = integration (Failsafe)
-├── Dockerfile                     # multi-stage, distroless, non-root
-├── docker-compose.yml             # app + Prometheus + Alertmanager + Grafana + Loki + Alloy
-├── helm/propertyhub               # Kubernetes chart (dashboards/ and files/alerts.yml shared with compose)
-├── infra/terraform                # AWS infrastructure as code (Terraform)
-├── infra/cloudformation           # same infrastructure as a CloudFormation template (+ Learner Lab mode)
-├── monitoring/                    # local Prometheus, Alertmanager, Alloy, Grafana provisioning
-├── Jenkinsfile                    # Jenkins version of the pipeline
-├── jenkins/                       # Jenkins image, configuration as code, Compose with SonarQube, guide
-├── scripts/                       # deploy, smoke test, state bootstrap, GitHub variables
-└── .github/                       # pipeline.yml, release.yml, infra.yml, synthetic-monitor.yml, dependabot
-```
+The listings are made-up demo data. The app keeps its data in memory, so it doesn't need a database.
 
 ---
 
-## 4. Prerequisites (Windows)
+## 2. Tools I used
 
-Install these, then use **Git Bash** for the shell commands below:
-
-| Tool | Version | Check |
+| Stage | Tool | What I used it for |
 |---|---|---|
-| Git for Windows (includes Git Bash) | any | `git --version` |
-| JDK (Temurin) | 21 | `java -version` |
-| Maven | 3.9+ (or run builds in Docker / IntelliJ) | `mvn -v` |
-| Docker Desktop | recent | `docker version` |
-| AWS CLI v2 + Session Manager plugin | v2 | `aws --version` |
-| Terraform | **≥ 1.10** | `terraform -version` |
-| GitHub CLI | any | `gh auth status` |
-| jq | any (`winget install jqlang.jq`) | `jq --version` |
-
-> Use your **personal AWS account**. AWS Academy Learner Lab accounts can't create IAM roles or OIDC
-> providers, which the secure deployment needs.
+| Source code | **Git + GitHub** | Store the code, feature branches, pull requests, branch protection on `main` |
+| Dependency updates | **Dependabot** | Opens a pull request automatically when a library is out of date |
+| CI/CD server | **Jenkins** (in Docker on AWS) | Runs the whole pipeline from the `Jenkinsfile` |
+| Build | **Maven**, Java 21, Spring Boot 3.5 | Compile the code and build the jar |
+| Testing | **JUnit 5, MockMvc, JaCoCo** | 44 unit tests, 25 integration tests, coverage check (build fails below 70%) |
+| Code quality | **SpotBugs + FindSecBugs**, **SonarQube** | Find bugs, bad code and security mistakes in my Java code |
+| Security | **Trivy**, **Gitleaks**, **Hadolint**, **Checkov**, **cfn-lint** | Find vulnerable libraries, leaked passwords, and mistakes in the Dockerfile and CloudFormation |
+| Container | **Docker** | Package the app as a small, secure image (distroless, runs as non-root) |
+| Image registry | **Docker Hub** | Store the images built by Jenkins |
+| Cloud | **AWS** (EC2, IAM, Secrets Manager, SSM) | Run Jenkins and the app |
+| Infrastructure as Code | **AWS CloudFormation** | Create all the AWS servers from YAML templates |
+| Orchestration | **Kubernetes (k3s) + Helm** | Run the app on the AWS server, roll back automatically if a deploy fails |
+| Monitoring | **Prometheus, Grafana, Alertmanager** | Metrics, dashboards and alerts |
+| Logging | **Loki** | Collect the app logs so I can search them in Grafana |
 
 ---
 
-## 5. Step-by-step
+## 3. How the pipeline works
 
-### Step 1: Create the GitHub repository and push
+```
+ Me ──► feature branch ──► Pull Request ──► merge to main
+                                                 │
+                         Jenkins checks GitHub every 2 minutes
+                                                 ▼
+   ┌────────────────────────────── Jenkins pipeline ──────────────────────────────┐
+   │ 1. Build & test        Maven, unit + integration tests, JaCoCo coverage       │
+   │ 2. Code quality        SpotBugs + SonarQube analysis                          │
+   │ 3. Quality gate        waits for SonarQube to say Passed                      │
+   │ 4. Security scans      Trivy, Gitleaks, Hadolint, Checkov (run in parallel)   │
+   │ 5. Docker build        builds the image                                       │
+   │ 6. Image scan & SBOM   Trivy scans the image, makes a list of all components  │
+   │ 7. Smoke test          starts the container and tests the pages and API       │
+   │ 8. Push image          pushes to Docker Hub                (main only)        │
+   │ 9. Deploy to AWS       AWS SSM → Helm on Kubernetes        (main only)        │
+   │10. Verify production   tests the live site, checks the new commit is live    │
+   └───────────────────────────────────────────────────────────────────────────────┘
+                                                 ▼
+                    AWS EC2 (k3s) ──► Prometheus + Grafana + Loki
+```
+
+- If **any stage fails, the pipeline stops** and nothing gets deployed.
+- Feature branches run stages 1–7 only. Only `main` is pushed and deployed.
+- Each image is tagged with the Git commit (for example `sha-1cfadb33f6b6`), so I always know exactly which code is running.
+- If the new version is unhealthy after the deploy, Helm **rolls back** to the old version automatically.
+
+---
+
+## 4. Folder structure
+
+```
+├── src/main/java/ie/propertyhub   # the Java app (calculators, service, web pages, API)
+├── src/test/java                  # unit tests (*Test) and integration tests (*IT)
+├── pom.xml                        # Maven build, JaCoCo and SpotBugs settings
+├── Dockerfile                     # multi-stage Docker build
+├── docker-compose.yml             # run the app + monitoring on my laptop
+├── Jenkinsfile                    # the CI/CD pipeline
+├── jenkins/                       # Jenkins Docker image + configuration as code + SonarQube
+├── infra/cloudformation/          # AWS templates: propertyhub.yaml (app server), jenkins.yaml (Jenkins server)
+├── helm/propertyhub/              # Kubernetes deployment (Helm chart)
+├── monitoring/                    # Prometheus, Grafana, Alertmanager, Loki settings
+├── scripts/                       # deploy, smoke test, create/delete stack scripts
+├── .trivyignore / .gitleaksignore # security findings I reviewed and accepted (with reasons)
+└── .github/dependabot.yml         # automatic dependency updates
+```
+
+---
+
+## 5. Steps I followed
+
+### Step 1: GitHub repository
+
+1. Created the public repo `L00205200/L00205200-propertyhub` and pushed the code.
+2. Created a `develop` branch.
+3. Protected the `main` branch with a ruleset: changes must come through a pull request, with no force pushes.
+4. For every change I made a branch (`feature/...` or `fix/...`), pushed it, opened a pull request and merged it.
 
 ```bash
-cd L00205200-propertyhub
-git init -b main
+git checkout -b feature/my-change
 git add .
-git commit -m "feat: PropertyHub Ireland app with CI/CD pipeline"
-gh repo create L00205200-propertyhub --public --source . --push   # public = free Actions minutes, CodeQL, GHCR
-git checkout -b develop && git push -u origin develop && git checkout main
+git commit -m "feat: my change"
+git push -u origin feature/my-change
+# then open a Pull Request on GitHub and merge it into main
 ```
 
-Then in GitHub open **Settings → Branches → Add rule** for `main`:
-- Require a pull request before merging (1 approval is optional when you work solo)
-- Require status checks to pass: *Build & test*, *SpotBugs*, *CodeQL*, *Trivy filesystem scan*, *Gitleaks*, *IaC lint & security*, *Docker build, scan & container smoke test*
-- Require branches to be up to date. Do not allow force pushes.
-
-Also open **Settings → Code security** and enable Dependabot alerts and secret scanning.
-
-### Step 2: Build and run locally
+### Step 2: Run it on my laptop first
 
 ```bash
-mvn verify                       # unit + integration tests + coverage gate (target/site/jacoco/index.html)
-docker compose up -d --build     # app + full monitoring stack
+mvn verify                      # build + all tests + coverage check
+docker compose up -d --build    # app + Prometheus + Grafana + Alertmanager + Loki
 ```
 
-| URL | What |
-|---|---|
-| http://localhost:8080 | PropertyHub |
-| http://localhost:8080/actuator/prometheus | raw metrics |
-| http://localhost:3000 | Grafana (admin/admin). Open **Dashboards → PropertyHub → Service Overview** |
-| http://localhost:9090/alerts | Prometheus alert rules |
-| http://localhost:9093 | Alertmanager |
+- App: http://localhost:8080
+- Grafana: http://localhost:3000
 
-Trigger an alert locally (this is good demo material):
-```bash
-for i in $(seq 1 400); do curl -s -o /dev/null localhost:8080/api/chaos/error; sleep 0.3; done
-```
-After about 2 minutes **PropertyHubHighErrorRate** goes *Firing* in Prometheus, Alertmanager and the Grafana panel.
-`docker compose down` stops everything.
+This let me check everything worked before I spent money on AWS. `docker compose down` stops it.
 
-### Step 3: Work with feature branches and pull requests
+### Step 3: Docker Hub
 
-```bash
-git checkout -b feature/compare-listings
-# ...make a change + a test...
-git commit -am "feat(search): add compare listings"
-git push -u origin feature/compare-listings
-gh pr create --base main --fill
-```
-The PR runs every build, test and security job. Merge only when all checks are green; **squash merge** keeps
-the history clean. Use conventional commit messages (`feat:`, `fix:`, `ci:`, `docs:`, `chore:`). Do at least 3–4
-real feature branches and PRs before the demo, so the history shows the workflow.
+1. Created a public repository `rajuaugustine/l00205200-propertyhub`.
+2. Created an access token (Read & Write) for Jenkins to push images.
 
-### Step 4: Check the first pipeline run
+### Step 4: AWS CLI
 
-Open **Actions → CI/CD Pipeline**. On `main` with no AWS configured yet, everything up to **Publish image to
-GHCR** runs. Deploy is skipped until Step 8.
+1. In my personal AWS account I created an IAM user for the CLI and an access key.
+2. Ran `aws configure` (region `eu-west-1`, Ireland) and checked it with `aws sts get-caller-identity`.
 
-- If **Trivy** fails on a CRITICAL CVE, the enforcement gate is working: bump the dependency (Dependabot
-  usually opens the PR), or add a documented, time-boxed entry to `.trivyignore`.
-- **Terraform fmt** fails? Run `terraform fmt -recursive infra/terraform` and commit.
-
-### Step 5: Make the container image public
-
-After the first `publish` run: **your GitHub profile → Packages → l00205200-propertyhub → Package settings →
-Change visibility → Public**. This lets the cluster pull the image without credentials.
-
-### Step 6 (optional): SonarCloud quality gate
-
-1. Sign in at sonarcloud.io with GitHub and import the repo. Turn **Automatic Analysis off** (CI analysis is used).
-2. **My Account → Security** → generate a token → GitHub **Settings → Secrets and variables → Actions → Secrets**: `SONAR_TOKEN`.
-3. Add **Variables** `SONAR_ORGANIZATION` (your org key) and `SONAR_PROJECT_KEY`.
-The `sonarcloud` job then runs and **fails the pipeline if the quality gate fails**.
-
-### Step 7: Provision AWS with Terraform
+### Step 5: Create the app server with CloudFormation
 
 ```bash
-aws configure                    # personal account, region eu-west-1 (keys stay on your laptop only)
-aws sts get-caller-identity
-
-# Safety net: a budget alert at $10/month (Billing console → Budgets) is strongly recommended.
-
-bash scripts/bootstrap-tf-state.sh eu-west-1          # S3 state bucket (versioned, encrypted, private)
-cd infra/terraform
-cp terraform.tfvars.example terraform.tfvars           # set github_repository = "YOUR_USER/L00205200-propertyhub"
-terraform fmt -recursive
-terraform init -backend-config=backend.hcl
-terraform plan -out tfplan
-terraform apply tfplan
-terraform output
-```
-
-The EC2 node takes **about 8–12 minutes** after `apply` to install k3s, Prometheus, Grafana and Loki. To watch it:
-```bash
-aws ssm start-session --target $(terraform output -raw instance_id)
-sudo tail -f /var/log/propertyhub-bootstrap.log        # ends with "Bootstrap complete"
-```
-
-### Step 7 (alternative): Provision AWS with CloudFormation
-
-`infra/cloudformation/propertyhub.yaml` builds the same infrastructure as the Terraform code: VPC, subnet, IGW,
-routes, HTTP-only security group, hardened EC2 with k3s and the monitoring stack, a Grafana password generated in
-**Secrets Manager**, and the GitHub OIDC deploy role. A **WaitCondition** makes the stack wait until the node
-reports that bootstrap has finished, so `CREATE_COMPLETE` means the cluster is ready.
-
-| Parameter | Personal account | AWS Academy Learner Lab |
-|---|---|---|
-| `CreateIamRoles` | `true` | `false` (Learner Lab can't create IAM roles) |
-| `ExistingInstanceProfile` | ignored | `LabInstanceProfile` |
-| `GitHubRepository` | `YOUR_USER/L00205200-propertyhub` | leave blank |
-
-**CLI (recommended):**
-```bash
-# edit infra/cloudformation/params-personal.json (GitHubRepository) first
 bash scripts/cfn-deploy.sh personal propertyhub eu-west-1
-#   Learner Lab (copy the lab's AWS CLI credentials into ~/.aws/credentials first; region us-east-1):
-bash scripts/cfn-deploy.sh learner-lab propertyhub us-east-1
 ```
 
-**Console:** CloudFormation → *Create stack* → *Upload a template file* → `propertyhub.yaml`. Fill in the
-grouped parameters, tick *I acknowledge that AWS CloudFormation might create IAM resources with custom names*,
-then *Submit*. Watch the **Events** tab; `BootstrapWaitCondition` completes after about 10–15 minutes.
+`infra/cloudformation/propertyhub.yaml` creates:
+- a VPC, subnet, security group (only HTTP open, **no SSH**) and an Elastic IP
+- an EC2 server (t3.large) that installs **k3s (Kubernetes)**, Prometheus, Grafana, Alertmanager and Loki when it starts
+- the Grafana password, generated in **AWS Secrets Manager** (never in my code)
 
-**Then connect GitHub:**
-```bash
-bash scripts/set-github-vars-cfn.sh propertyhub eu-west-1
-```
-- **Personal account:** sets `AWS_DEPLOY_ROLE_ARN`, and the pipeline uses OIDC.
-- **Learner Lab:** there is no OIDC role, so add the lab's temporary `AWS_ACCESS_KEY_ID`, `AWS_SECRET_ACCESS_KEY`
-  and `AWS_SESSION_TOKEN` as repository **secrets**. The deploy job falls back to them automatically.
-  These credentials change each lab session, so update them before you deploy. Learner Lab stops the EC2
-  instance when the session ends; k3s restarts by itself when you start the lab again.
+It took about 10–15 minutes. The stack only says `CREATE_COMPLETE` when the server reports that its setup has finished.
 
-Grafana password: run the `GrafanaPasswordCommand` value from the stack **Outputs**.
-To tear down: `bash scripts/cfn-delete.sh propertyhub eu-west-1` (or *Delete* in the console).
+### Step 6: Create the Jenkins server with CloudFormation
 
-### Step 8: Connect GitHub to AWS (no stored keys)
+`infra/cloudformation/jenkins.yaml` (stack name `propertyhub-ci`) creates a second EC2 server running
+**Jenkins and SonarQube in Docker**. Jenkins is **configured as code** (`jenkins/casc/jenkins.yaml`), so the admin user,
+the SonarQube connection and the pipeline job are all created automatically. The admin password is also in Secrets
+Manager. The server's IAM role is only allowed to send deploy commands to my app server.
 
-```bash
-cd ../..
-bash scripts/set-github-vars.sh     # writes EC2_INSTANCE_ID, APP_URL, GRAFANA_URL, AWS_DEPLOY_ROLE_ARN, ...
-```
-Then in GitHub **Settings → Environments**:
-- Create **`production`**. Optionally add yourself as a *Required reviewer* (a manual approval gate) and limit deployment branches to `main`.
-- Create **`infrastructure`** with yourself as a *Required reviewer*. It is used by `infra.yml`.
+### Step 7: Set up Jenkins
 
-The AWS roles only trust tokens from **this repo and these environments**, so other repos and branches can't deploy.
+1. Logged in at `http://<jenkins-ip>:8080`.
+2. **Manage Jenkins → Credentials → Global → Add Credentials:**
+   - `dockerhub-creds` (username + Docker Hub token)
+   - `sonar-token` (secret text, from SonarQube)
+3. Added a branch filter to the job, so it only builds `main`, `develop`, `feature/*` and `fix/*`.
 
-### Step 9: Deploy
+### Step 8: Set up SonarQube
 
-Merge a PR to `main`, or run **Actions → CI/CD Pipeline → Run workflow** on `main`. The `deploy` job:
-1. assumes `propertyhub-github-deploy` through **OIDC**
-2. sends `scripts/deploy-on-node.sh` to the node through **SSM Run Command** (port 22 is closed)
-3. runs `helm upgrade --atomic`, which rolls back automatically if pods never become ready
-4. passes a **Prometheus gate**: new pods must be scraped and no critical alert may fire, otherwise it runs `helm rollback` and fails the run
-5. `verify` smoke-tests production and checks `/actuator/info` reports the **new commit SHA**
+1. Logged in at `http://<jenkins-ip>:9000` and changed the admin password.
+2. **My Account → Security** → generated a *Global Analysis Token* and added it to Jenkins as `sonar-token`.
+3. **Administration → Configuration → Webhooks** → added `http://jenkins:8080/sonarqube-webhook/`, so Jenkins knows when the analysis is finished.
+4. Turned on `RUN_SONAR` in the `Jenkinsfile`.
 
-Open the app at `APP_URL`. Grafana is at `APP_URL/grafana`; the user is `admin` and the password comes from:
-```bash
-cd infra/terraform && $(terraform output -raw grafana_password_command)
-```
-Useful cluster commands (inside `aws ssm start-session`):
-```bash
-sudo -i
-kubectl -n propertyhub get deploy,pods,hpa,svc,ingress
-helm -n propertyhub history propertyhub
-kubectl -n monitoring get pods
-```
+Result: **Quality Gate Passed**, 0 vulnerabilities, 95% coverage, 0% duplication.
 
-### Step 10: Show monitoring, alerts and feedback loops
+### Step 9: Run the pipeline
 
-- **Dashboard:** Grafana → *PropertyHub Ireland (L00205200) - Service Overview*: request rate, error %, p50/p95/p99 latency,
-  searches/valuations/affordability checks, active listings, heap, CPU, GC, and live **Loki logs**.
-- **Alert:** run the chaos loop from Step 2 against `APP_URL`, then show *PropertyHubHighErrorRate* firing in
-  Grafana → Alerting (and the "Firing alerts" panel).
-- **Pipeline feedback:** while an alert is firing, re-run the pipeline. The deploy gate refuses the release and rolls back.
-- **Synthetic monitor:** `synthetic-monitor.yml` probes production every 30 minutes. A failure opens an `incident` issue;
-  recovery closes it.
+I merged a pull request into `main`. Jenkins picked it up, ran all 10 stages, pushed the image to Docker Hub and
+deployed it to AWS. The `/about` page shows the new commit, which proves the new version is live.
 
-### Step 11: Cut a release
+### Step 10: Monitoring
 
-```bash
-git checkout main && git pull
-git tag -a v1.0.0 -m "First release" && git push origin v1.0.0
-```
-`release.yml` builds and tests, pushes `ghcr.io/<you>/l00205200-propertyhub:1.0.0`, and publishes a GitHub Release with
-generated notes, the jar and the packaged Helm chart.
-
-### Step 12: Tear down (avoid charges)
-
-```bash
-cd infra/terraform && terraform destroy
-```
-Running cost is roughly **$2–3 per day** (t3.large + 30 GB gp3 + public IPv4). Destroy the stack after the demo and
-re-create it in about 15 minutes with `terraform apply`. You can also run **Actions → Infrastructure** with `destroy`.
+- Grafana dashboard **PropertyHub Ireland (L00205200) - Service Overview**: requests per second, errors, response time,
+  searches and valuations, memory and CPU, and live logs from Loki.
+- Alerts in Prometheus/Alertmanager: app down, high error rate, slow responses, high CPU, pod restarts.
+- To test an alert, I sent lots of requests to a test error page:
+  ```bash
+  for i in $(seq 1 400); do curl -s -o /dev/null http://34.246.109.154/api/chaos/error; sleep 0.3; done
+  ```
+  After about 2 minutes the **PropertyHubHighErrorRate** alert starts firing.
 
 ---
 
-## 6. Demo script (about 10 minutes)
+## 6. Problems I faced and how I fixed them
 
-1. **Repo tour (1 min):** README diagram, folders, branch protection rule, merged PRs, tags/releases.
-2. **Git workflow (1 min):** create `feature/demo-change`, edit a template or text, push, open PR.
-3. **CI (3 min):** while the PR runs, walk through the jobs: tests + coverage report, SpotBugs, CodeQL alerts in the Security tab,
-   Trivy SARIF, Gitleaks, Checkov/Hadolint, image scan + SBOM. Optional: show a failing gate (e.g. add a fake AWS key in a branch → Gitleaks fails).
-4. **CD (2 min):** merge → publish → deploy (show OIDC, SSM output, Helm atomic, Prometheus gate) → verify; open the live site.
-5. **Cloud & IaC (1 min):** `terraform plan` shows no changes (reproducible), with no SSH and no stored keys.
-6. **Monitoring (2 min):** Grafana dashboard + Loki logs, trigger the chaos alert, show Alertmanager/Grafana firing, explain the rollback gate and incident issues.
+This was the most useful part of the project for learning. These are the real problems I hit.
 
----
+| # | Problem | What caused it | How I fixed it |
+|---|---|---|---|
+| 1 | `aws configure` gave `InvalidClientTokenId` | I pasted my Docker Hub token in the AWS Access Key field by mistake | Created a new AWS access key and entered the right values |
+| 2 | I accidentally showed a token and password in a screenshot | Human mistake | Deleted the key and made a new one, changed the password. Lesson: never share keys in screenshots or chat |
+| 3 | The CloudFormation script failed on Windows | Git Bash changed the `file://` path to a Windows path | Changed the script to use relative paths |
+| 4 | The EC2 server couldn't download anything at startup | The server started before the Elastic IP was attached, so there was no internet yet | Added a "wait for internet" loop at the start of the setup script |
+| 5 | The Jenkins stack failed and Jenkins wouldn't start | A setting in the Jenkins configuration file (`excludeClientIPFromCrumb`) doesn't exist in the new Jenkins version. I also edited the wrong file the first time (the CloudFormation `jenkins.yaml` instead of `jenkins/casc/jenkins.yaml`) | Removed the old setting, merged the fix, then ran `git pull` and `docker compose up -d --build` on the server |
+| 6 | Too many builds in the Jenkins queue | Dependabot created about 11 branches and Jenkins tried to build all of them | Added a branch filter: `^(main\|develop\|feature/.*\|fix/.*)$` |
+| 7 | Gitleaks failed the build | It found `admin:PASSWORD` in an example in the Jenkins README. It wasn't a real password | Removed it from the README and added the finding to `.gitleaksignore` with a comment |
+| 8 | Trivy found **16 CRITICAL** vulnerabilities in the Docker image | Old versions of Tomcat and Thymeleaf | Upgraded Tomcat to 10.1.62 and Thymeleaf to 3.1.5. (I first tried Tomcat 10.1.58, but that version doesn't exist.) |
+| 9 | 3 CRITICAL vulnerabilities were still there | No fix is available yet in Spring 6 (the fix is only in Spring Boot 4) or in the base image | Added them to `.trivyignore` with a reason and an expiry date (31 Dec 2026), so they come back for review |
+| 10 | The image scan still failed after step 9 | The `trivy image` command wasn't using the `.trivyignore` file | Added `--ignorefile` to the command in the `Jenkinsfile` |
+| 11 | The smoke test failed with `exit code 23` even though the site was working | `grep -q` stops reading early, so `curl` got a write error, and `set -o pipefail` treated that as a failure | Download the page first, then search it |
+| 12 | SonarQube settings pointed to the wrong server | `pom.xml` still had old **SonarCloud** settings | Removed them, so Jenkins uses my own SonarQube server |
+| 13 | Gitleaks failed again after turning on SonarQube | It thought `sonar.projectKey=L00205200-propertyhub` was an API key because of the word "Key" | Checked it was only the project name and added it to `.gitleaksignore` |
 
-## 7. Security and secret management
-
-- **No long-lived cloud credentials in GitHub:** OIDC roles are scoped to `repo:<owner>/<repo>:environment:production|infrastructure`.
-- Deploy role permissions: `ssm:SendCommand` on **one instance** and one document. Nothing else.
-- Grafana password: generated by Terraform, stored as an **SSM SecureString**, read by the node at boot, and kept in a Kubernetes Secret. It never appears in git.
-- Node: IMDSv2 only, encrypted EBS, **no SSH port**, default security group locked down, k3s secrets encryption.
-- Pods: non-root UID 65532, read-only root filesystem, all capabilities dropped, seccomp `RuntimeDefault`, NetworkPolicy, no service-account token.
-- App: CSP / X-Frame-Options / nosniff / Referrer-Policy headers, Bean Validation on all inputs, no stack traces in errors.
-- Supply chain: pinned base images, SBOM (CycloneDX), build provenance attestation, Dependabot.
-
----
-
-## 8. Troubleshooting
-
-| Symptom | Fix |
-|---|---|
-| Deploy job skipped | `EC2_INSTANCE_ID` variable not set. Run Step 8. |
-| `Not authorized to perform sts:AssumeRoleWithWebIdentity` | `github_repository` in tfvars must match `owner/repo` exactly (case-sensitive); the job must use environment `production` |
-| Pods `ImagePullBackOff` | Make the GHCR package public (Step 5) |
-| Deploy waits for "bootstrap" | Node still installing; see `/var/log/propertyhub-bootstrap.log` |
-| `EntityAlreadyExists` for the OIDC provider | Set `create_github_oidc_provider = false` |
-| Grafana 404 at `/grafana` | Wait for bootstrap; check `kubectl -n monitoring get ingress` |
-| Compose logs missing in Grafana | Docker Desktop: Settings → General → enable "Expose daemon on default socket" (Alloy reads `/var/run/docker.sock`) |
+**Dependabot pull requests:** I merged the small updates after Jenkins passed. I didn't merge the big ones
+(Spring Boot 4 and Java 26), because they are major upgrades that need more testing.
 
 ---
 
-## 9. Tools used (for Task 4)
+## 7. What I learned
 
-| Stage | Tool | Why |
-|---|---|---|
-| SCM | GitHub, GitHub Flow, branch protection, Dependabot | PR-based review, required checks |
-| CI | GitHub Actions | native to the repo, OIDC to AWS, free for public repos |
-| Build/test | Maven, JUnit 5, AssertJ, MockMvc, Failsafe, JaCoCo | unit + integration tests, coverage gate |
-| SAST | SpotBugs + FindSecBugs, CodeQL, SonarCloud | bugs + security patterns + quality gate |
-| SCA / secrets / IaC | Trivy, Gitleaks, Checkov, Hadolint, kubeconform | CVEs, leaked secrets, misconfigurations |
-| Container | Docker (BuildKit), distroless Java 21 | small, no shell, non-root |
-| Orchestration | k3s (Kubernetes), Helm | lightweight K8s on one EC2 node; templated, versioned releases |
-| IaC | Terraform (S3 backend with native locking) | reproducible AWS infrastructure |
-| Secrets | GitHub OIDC, AWS SSM Parameter Store | no static keys, encrypted secrets |
-| Deploy | AWS SSM Run Command | no SSH keys or open ports |
-| Monitoring | Prometheus, Alertmanager, Grafana, Micrometer | metrics, alerts, dashboards |
-| Logging | Loki + Promtail (K8s), Alloy (Compose), ECS JSON logs | centralised, searchable logs in Grafana |
+- A pipeline is only useful if it **stops bad code**. Trivy, Gitleaks and the tests all stopped my builds at least once, and that's what they're for.
+- Not every security finding is real. You have to **read it, decide, and write down why** (in `.trivyignore` and `.gitleaksignore`).
+- Build logs are the most important thing for fixing problems. Most of my fixes came from reading the failed stage log carefully.
+- Infrastructure as Code is very handy: I can delete everything and create it again with one command.
+- Small changes on branches with pull requests make it easy to find what broke.
+
+---
+
+## 8. Limitations (things I would improve)
+
+- The site uses **HTTP**, not HTTPS. Next I would add a domain name and a certificate.
+- Everything runs on **one EC2 server**, so there's no high availability.
+- SonarQube is an older version (9.9) with its built-in database. That's fine for a demo, but not for real use.
+- The app data is in memory, so it resets when the app restarts.
+- The Jenkins CloudFormation stack shows `CREATE_FAILED` from the first attempt (problem 5), but the server itself is working.
+
+---
+
+## 9. Clean up (to stop AWS charges)
+
+```bash
+bash scripts/cfn-delete.sh propertyhub eu-west-1
+aws cloudformation delete-stack --stack-name propertyhub-ci --region eu-west-1
+```
+
+The two t3.large servers cost roughly $2–3 a day each, so I delete them after the demo.

@@ -111,7 +111,6 @@ pipeline {
                         sh 'docker run --rm -v "$WORKSPACE:/src" -w /src python:3.12-slim sh -c ' +
                            '"pip install -q --root-user-action=ignore checkov cfn-lint && ' +
                            'cfn-lint infra/cloudformation/*.yaml && ' +
-                           'checkov -d infra/terraform --framework terraform --compact --quiet && ' +
                            'checkov -d infra/cloudformation --framework cloudformation --compact --quiet && ' +
                            'checkov -f Dockerfile --framework dockerfile --compact --quiet"'
                     }

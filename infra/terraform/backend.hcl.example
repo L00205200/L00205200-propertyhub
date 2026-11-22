@@ -1,6 +1,0 @@
-# Copy to backend.hcl (git-ignored). Bucket is created by scripts/bootstrap-tf-state.sh
-bucket       = "propertyhub-tfstate-ACCOUNT_ID"
-key          = "propertyhub/terraform.tfstate"
-region       = "eu-west-1"
-encrypt      = true
-use_lockfile = true
