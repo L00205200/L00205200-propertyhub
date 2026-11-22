@@ -2,3 +2,5 @@
 7fb3f133e27fdfbf0bbb568da2f9c2e48de27357:jenkins/README.md:curl-auth-user:135
 # Reviewed false positive: SonarQube project key (project name, not a secret).
 6cf711f989f54de1513c825c2f14e5a5b2cff28a:Jenkinsfile:generic-api-key:71
+# Reviewed false positive: README example quoting the Sonar project key (not a secret).
+9ba1e6429dcf75b3ab436d6aab4e2b4f8aa56b59:README.md:generic-api-key:221

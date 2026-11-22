@@ -218,7 +218,7 @@ This was the most useful part of the project for learning. These are the real pr
 | 10 | The image scan still failed after step 9 | The `trivy image` command wasn't using the `.trivyignore` file | Added `--ignorefile` to the command in the `Jenkinsfile` |
 | 11 | The smoke test failed with `exit code 23` even though the site was working | `grep -q` stops reading early, so `curl` got a write error, and `set -o pipefail` treated that as a failure | Download the page first, then search it |
 | 12 | SonarQube settings pointed to the wrong server | `pom.xml` still had old **SonarCloud** settings | Removed them, so Jenkins uses my own SonarQube server |
-| 13 | Gitleaks failed again after turning on SonarQube | It thought `sonar.projectKey=L00205200-propertyhub` was an API key because of the word "Key" | Checked it was only the project name and added it to `.gitleaksignore` |
+| 13 | Gitleaks failed again after turning on SonarQube | It thought the Sonar project key setting in the Jenkinsfile was an API key because of the word "Key" | Checked it was only the project name and added it to `.gitleaksignore` |
 
 **Dependabot pull requests:** I merged the small updates after Jenkins passed. I didn't merge the big ones
 (Spring Boot 4 and Java 26), because they are major upgrades that need more testing.
